@@ -6,3 +6,6 @@
 Thumbs.db
 # stray download archives
 *.zip
+
+# backup/ 保留脚手架原始压缩包归档（与已解压源码并存的纯净版本）
+!backup/*.zip

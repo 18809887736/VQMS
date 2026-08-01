@@ -1,0 +1,8 @@
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+# stray download archives
+*.zip

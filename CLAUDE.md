@@ -4,32 +4,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-**This is a planning/docs-only repo — no backend, frontend, or infrastructure code exists yet.** The implementation described below is the agreed target, captured in the planning docs. When code lands, update this file with real build/test commands.
+**Planning/docs-only — no VQMS application code exists yet except the RuoYi scaffolding under `RuoYi-Vue-springboot3/` (backend) and `RuoYi-Vue3/` (frontend).** The target below is captured in the planning docs. When code lands, update this file with real build/test commands.
 
-- `项目规划_v2.md` — **authoritative** plan (v2 monolith). Work against this one.
-- `项目规划.md` — v1 microservices plan, **superseded**. Kept for history; do not implement from it.
+- `项目规划_v3_1.md` — **authoritative** plan (v3.1, RuoYi base, **MySQL decided**). Work against this one.
+- `项目规划_v3.md` — introduced the RuoYi base but left main-DB choice open. Superseded by v3.1.
+- `项目规划_v2.md` — v2 "from-scratch monolith", PostgreSQL. Superseded by v3/v3.1.
+- `项目规划.md` — v1 microservices. Superseded.
 - `his_curve_sv.md` / `his_curve_tables.md` — schema + sample data for the external source tables.
 - `tmp.md` — scratch notes; **contains plaintext DB credentials** (see Security).
+- `RuoYi-Vue-springboot3/` — backend scaffold (RuoYi-Vue, Spring Boot 3.5.14, Java 17). Base for the new `ruoyi-vqms` module.
+- `RuoYi-Vue3/` — frontend scaffold (Vue 3 + Element Plus + Vite).
 - Docs and UI are in Chinese; the domain is Chinese power-utility AVC / substation busbar voltage.
 
-## Architecture (v2 monolith — the target)
+## Architecture (v3.1 — RuoYi-Vue base, MySQL decided)
 
-Single Spring Boot 3.x (Java 17) app, deployed as **3 Docker Compose containers**: `postgres`, `backend`, `nginx`. No microservices, no Redis, no second JVM.
+Built on **若依/RuoYi-Vue** (separated front/back edition, Spring Security + JWT + Redis) — NOT the v2 from-scratch monolith, and NOT `y_project/RuoYi` (Shiro + Thymeleaf single-app). Deployed as **4 Docker Compose containers**: `mysql`, `redis`, `backend`, `nginx`.
 
-- **PostgreSQL 15** — the *only* persistent store. Holds management data (users/roles/config/logs) **and** derived statistics (daily/monthly/yearly). It must **never** store raw business data.
-- **External source** — read-only business data (`his_curve_sv` raw voltage curve). Currently MySQL 5.7 mirrored at `10.0.0.9 / qheatavchisdb`; designed to be swappable to MySQL 8 / SQLite / PostgreSQL later (see below).
-- **JWT stateless auth** — login signs a token, Spring Security filter validates; no session store, no Redis, no hot cache.
-- **Backend package layout** (`com.vqms`): `common` (config/entities/dto/exception) · `source` (external read layer) · `statistics` (algorithm, shared by web + ingestion) · `ingestion` (`@Scheduled` precompute) · `web` (controllers) · `security` (JWT).
-- Statistics module is called **in-process** (direct method call, not network) by both the query controllers and the scheduler. No Feign, no gateway.
-- **Planned ports** (host:container): postgres `15432:5432`, backend `7000:7000`, nginx `8080:80`.
+- **MySQL 8.4** — the *only* persistent store (main DB). Holds RuoYi `sys_*` management tables **and** VQMS `voltage_quality_*` derived statistics. Must **never** store raw business data. (v2 chose PostgreSQL; v3.1 overrode it because RuoYi is MySQL-native — zero dialect/script migration.)
+- **Redis** — required by RuoYi (login tokens, captcha, rate-limit, dict/config cache). v2 had no Redis; v3.1 accepts it as RuoYi's cost of entry.
+- **External source** — read-only business data (`his_curve_sv` raw voltage curve). Currently MySQL 5.7 mirrored at `10.0.0.9 / qheatavchisdb`; designed to be swappable (see below). Reached via RuoYi's multi-datasource (`@DataSource(SLAVE)`) as a read-only slave, isolated from the main DB.
+- **Auth** — RuoYi's Spring Security + JWT, reused as-is.
+- **Backend** = RuoYi's 6 native modules (`ruoyi-admin/framework/system/quartz/generator/common`) **+ one new `ruoyi-vqms` business module** containing `source/` (external read layer), `statistics/` (qualification-rate algorithm), `ingestion/` (Quartz precompute jobs). VQMS controllers live under `com.ruoyi.web.controller.vqms`.
+- Statistics module is called **in-process** (direct method call) by both query controllers and Quartz jobs. No Feign, no gateway.
+- **Planned ports** (host:container): mysql `13306:3306`, redis `16379:6379`, backend `7000:7000`, nginx `8080:80`. API prefix `/dev-api` (RuoYi convention; Nginx strips and proxies to `backend:7000`).
+
+## RuoYi reuse vs VQMS build (don't reinvent the scaffold)
+
+RuoYi solves the *generic admin system*; it does **not** solve voltage quality. Keep the boundary crisp:
+- **Reuse as-is**: login/JWT, user/role/menu/dept/dict/config management, oper/login logs, Quartz scheduler (with UI), Excel via POI (`@Excel`), code-gen, Druid monitor, Swagger, multi-datasource routing, frontend shell (login/layout/menu/user-center). RuoYi's `sys_*` tables and `sql/ry_*.sql` init scripts are used directly — do not re-create management tables.
+- **Build ourselves** (the actual VQMS value): `source/` (external read + dialect-swap), `statistics/` (per-minute verdict + daily/monthly/yearly weighted rollup), `ingestion/` (Quartz precompute jobs), and frontend `src/views/vqms/` dashboards (curve/daily/monthly/yearly + ECharts + export buttons).
+- **Upgrade-friendliness**: keep all changes inside `ruoyi-vqms`; do not modify RuoYi's native 6 modules. Minimizes merge pain when tracking upstream RuoYi releases.
 
 ## Storage-split rule (easy to violate — read this)
 
-Raw voltage curves are **never copied into PG**. The external source is the single source of truth for raw data; PG stores only recomputable derived statistics. The `source/` package is the sole read path to the external DB and is read-only by design (prevents accidental writes). When in doubt about where data lives: raw = external source; management + stats = PG.
+Raw voltage curves are **never copied into the MySQL main DB**. The external source is the single source of truth for raw data; MySQL stores only recomputable derived statistics + management data. The `source/` layer (inside `ruoyi-vqms`) is the sole read path to the external DB and is read-only by design (prevents accidental writes). When in doubt about where data lives: raw = external source; management + stats = MySQL.
 
 ## External-source DB portability
 
-The external source type is expected to change (currently MySQL 5.7). The `source` layer must stay dialect-agnostic:
+This is about the **external source** — independent of the (decided) MySQL main DB. The external source type is expected to change (currently MySQL 5.7). The `source/` layer must stay dialect-agnostic:
 - Access goes through a `HisCurveSvReader` **interface** returning JDBC-independent domain objects; one impl per dialect (`Mysql57CurveReader` today).
 - `save_time` is `varchar` and date-parse syntax differs by DB (`STR_TO_DATE` / `strftime` / `to_timestamp`) — keep parsing inside the impl, or `SELECT` the raw string and parse in Java.
 - Selection via config: `source.type=mysql57|mysql8|sqlite|postgres` + `source.driver` / `source.url` in `.env`/`sys_config`. Switching = change config + swap impl Bean; statistics and web code unchanged.
@@ -44,10 +56,10 @@ These constraints come from the source schema and are non-obvious — they affec
 - **Dual-write**: each minute writes one row for busbar `0` and one for busbar `1`. Group all statistics by `busbar_num`.
 - **Per-minute verdict** uses `average_SV` against `[low_SV, high_SV]`: `low≤avg≤high` = qualified, `avg>high` = over-high, `avg<low` = over-low. Boundary equality counts as qualified.
 - **`plan_SV` is raw telemetry code** (e.g. `10245`), not a real voltage — needs `ori_code` decode, but that table is currently **empty**. Treat as placeholder TODO; read/display raw for now.
-- **Rollup weighting (critical)**: monthly stats roll up from daily, yearly from monthly, via SQL `INSERT...SELECT...GROUP BY` summing **minute counts**. **Never average the rate columns directly** — recompute `qualification_rate = SUM(qualified_minutes)/SUM(total_minutes)*100` etc. `avg_SV` is weighted by `total_minutes`.
+- **Rollup weighting (critical)**: monthly stats roll up from daily, yearly from monthly, via MySQL `INSERT...SELECT...GROUP BY...ON DUPLICATE KEY UPDATE` summing **minute counts** (full DDL + rollup SQL in `项目规划_v3_1.md` §5.2 / §6.3). **Never average the rate columns directly** — recompute `qualification_rate = SUM(qualified_minutes)/SUM(total_minutes)*100` etc. `avg_SV` is weighted by `total_minutes`. (`VALUES(col)` in the UPSERT is deprecated since MySQL 8.0.20 but still works; see v3.1 §6.3 note for the alias-syntax alternative.)
 - Sample data is degenerate steady-state (`high=low=avg=234` → 100% qualified); algorithm branches for over-limit cases need real varying data to validate.
 
 ## Security
 
 - `tmp.md` committed **plaintext DB credentials** (MySQL root password, host). Before this repo is ever made public: scrub the password from git history and rotate it. Do not add new secrets to tracked files.
-- `.env` (planned) must never be committed — it holds external-source connection strings, PG password, JWT secret.
+- `.env` (planned) must never be committed — it holds external-source connection strings, MySQL root password, Redis address, JWT secret.

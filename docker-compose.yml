@@ -35,6 +35,7 @@ services:                         # 顶级 key：定义所有服务容器
       - mysql_data:/var/lib/mysql # 数据目录持久化（named volume：容器删除后数据仍在）
       # ↓ 只读挂载 sql/ 到 mysql 官方初始化目录：首启按文件名顺序自动执行（00-*.sh 先于 *.sql）
       - ./RuoYi-Vue-springboot3/sql:/docker-entrypoint-initdb.d:ro
+      - ./mysql-charset.cnf:/etc/mysql/conf.d/charset.cnf:ro  # 强制 mysql CLI 导入 .sql 用 utf8mb4（修中文双重编码）
     healthcheck:                  # 健康检查；backend 依赖 mysql 判为 healthy 才启动
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]  # 用 root 做 ping 探测
       interval: 10s               # 每 10s 探测一次

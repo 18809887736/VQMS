@@ -1,0 +1,8 @@
+# docker mysql 客户端字符集配置（挂载到 /etc/mysql/conf.d/charset.cnf）
+# 修复 entrypoint 导入 .sql 时的中文双重编码：mysql CLI 默认 latin1，导致 UTF-8 的 ry_*.sql
+# 被当 latin1 解码再以 utf8mb4 存储（mojibake）。强制 CLI 用 utf8mb4 连接。
+[client]
+default-character-set = utf8mb4
+
+[mysql]
+default-character-set = utf8mb4

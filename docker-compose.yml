@@ -1,119 +1,122 @@
-# VQMS 部署编排（项目规划_v3_1.md §9）
-# 4 容器：mysql / redis / backend(RuoYi-Vue-springboot3) / nginx(RuoYi-Vue3 构建产物 + 反代)
+# =============================================================================
+# VQMS 部署编排（详见 项目规划_v3_1.md §9）
+# 架构：4 容器  mysql + redis + backend(RuoYi-Vue-springboot3) + nginx(RuoYi-Vue3)
+#
+# 端口(host:container)：mysql 13306:3306 · redis 16379:6379 · backend 7000:7000 · nginx 8080:80
+# 账号：root 仅首启初始化；运行时连库用最小权限账号 DB_USER（vqms_app，仅 DML，v3.1 §9）
 #
 # 使用前：
-#   1. cp .env.example .env，按注释填好口令等信息
+#   1. cp .env.example .env，按注释填好口令等信息（.env 切勿提交 git）
 #   2. docker compose up -d --build
-#   3. 首次启动 mysql 会自动执行 RuoYi-Vue-springboot3/sql/ 目录下的所有脚本：
-#      - 00-create-app-user.sh  建最小权限应用账号 DB_USER（v3.1 §9）
-#      - quartz.sql / ry_20260417.sql  RuoYi 官方 sys_* 管理表 + Quartz 表
-#      VQMS 的 voltage_quality_* 四张表（v3.1 §5.2）待 M1 阶段补充脚本到同一目录
+#   3. 首启 mysql 自动执行 RuoYi-Vue-springboot3/sql/ 下脚本（按文件名顺序）：
+#      00-create-app-user.sh → 建应用账号；quartz.sql / ry_20260417.sql → sys_* + Quartz 表；
+#      vqms.sql → voltage_quality_* 四张统计表（v3.1 §5.2，已在同目录，首启一并建好）
+# =============================================================================
 
-services:
-  mysql:
-    image: mysql:8.4
-    container_name: vqms-mysql
-    restart: unless-stopped
-    environment:
-      TZ: Asia/Shanghai
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      # 供 sql/00-create-app-user.sh 初始化脚本读取，用来建最小权限应用账号
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_general_ci
-      - --default-authentication-plugin=mysql_native_password
+services:                         # 顶级 key：定义所有服务容器
+  mysql:                          # ---- MySQL 主库（管理 + 派生统计，唯一持久库，v3.1 §1.4）----
+    image: mysql:8.4              # 官方镜像 8.4（RuoYi 原生，零方言迁移）
+    container_name: vqms-mysql    # 固定容器名，便于日志排查
+    restart: unless-stopped       # 崩溃自动重启；手动 stop 后不再拉起
+    environment:                  # ---- 容器环境变量（mysql 官方 entrypoint + 初始化脚本读取）----
+      TZ: Asia/Shanghai           # 容器时区，影响日志时间戳与数据库默认时区
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}   # root 密码：仅首启建库/建表/建应用账号用，运行时不再使用（v3.1 §9）
+      MYSQL_DATABASE: ${MYSQL_DATABASE}             # 首启自动创建的库名（ry_vqms）；.sql 脚本默认在该库下执行
+      # ↓ 以下两个供 sql/00-create-app-user.sh 读取，用来建最小权限应用账号（非 mysql 官方变量）
+      DB_USER: ${DB_USER}                           # 应用账号名（vqms_app），后端运行时连库用它
+      DB_PASSWORD: ${DB_PASSWORD}                   # 应用账号密码
+    command:                      # 启动参数（追加到 mysqld 默认命令）
+      - --character-set-server=utf8mb4              # 服务端默认字符集（utf8mb4 完整支持中文/emoji）
+      - --collation-server=utf8mb4_general_ci       # 默认排序规则（大小写不敏感）
+      - --default-authentication-plugin=mysql_native_password  # 认证插件回退，兼容老客户端/驱动
     ports:
-      - "13306:3306"
+      - "13306:3306"              # host 13306 → 容器 3306；host 侧改高端口避让本机已装的 mysql
     volumes:
-      - mysql_data:/var/lib/mysql
-      # RuoYi 官方建表脚本 + 应用账号建号脚本，首次启动时按文件名顺序自动执行
+      - mysql_data:/var/lib/mysql # 数据目录持久化（named volume：容器删除后数据仍在）
+      # ↓ 只读挂载 sql/ 到 mysql 官方初始化目录：首启按文件名顺序自动执行（00-*.sh 先于 *.sql）
       - ./RuoYi-Vue-springboot3/sql:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+    healthcheck:                  # 健康检查；backend 依赖 mysql 判为 healthy 才启动
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]  # 用 root 做 ping 探测
+      interval: 10s               # 每 10s 探测一次
+      timeout: 5s                 # 单次探测超时 5s
+      retries: 10                 # 连续 10 次失败才判 unhealthy（给首启充足时间）
     networks:
-      - vqms-net
+      - vqms-net                  # 接入内部桥接网络
 
-  redis:
+  redis:                          # ---- Redis（RuoYi 硬依赖：token / 验证码 / 限流 / 字典缓存）----
     image: redis:7
     container_name: vqms-redis
     restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]  # 带密码启动 + 开 AOF 持久化
     ports:
-      - "16379:6379"
+      - "16379:6379"              # host 16379 → 容器 6379；避让本机 redis
     volumes:
-      - redis_data:/data
+      - redis_data:/data          # AOF/RDB 持久化目录
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]  # 带密码 ping（-a 传密码）
       interval: 10s
       timeout: 5s
       retries: 10
     networks:
       - vqms-net
 
-  backend:
-    build:
-      context: ./RuoYi-Vue-springboot3
-      dockerfile: Dockerfile
+  backend:                        # ---- 后端（RuoYi-Vue-springboot3 单体 Spring Boot）----
+    build:                        # 本地构建镜像（多阶段：maven 打包 → JRE 运行，见 Dockerfile）
+      context: ./RuoYi-Vue-springboot3   # 构建上下文 = 真正源码目录（含 pom.xml）
+      dockerfile: Dockerfile      # Dockerfile 与 pom.xml 同级
     container_name: vqms-backend
     restart: unless-stopped
-    depends_on:
+    depends_on:                   # 启动依赖：等 mysql/redis 都 healthy 才起后端（避免连不上反复重试崩溃）
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
+    environment:                  # ---- Spring Boot 宽松绑定：覆盖 application*.yml 默认值，源码不改一行 ----
       TZ: Asia/Shanghai
-      # Spring Boot 环境变量宽松绑定，覆盖 application*.yml 里的默认值，源码不用改一行
-      SERVER_PORT: "7000"
-      # 注意：连库用的是最小权限应用账号 DB_USER，不是 root（v3.1 §9）
-      SPRING_DATASOURCE_DRUID_MASTER_URL: >-
+      SERVER_PORT: "7000"         # 后端监听端口（与下方 ports、nginx 反代目标一致）
+      # ↓ 连库用最小权限应用账号 DB_USER（不是 root）；v3.1 §9
+      SPRING_DATASOURCE_DRUID_MASTER_URL: >-   # Druid 主数据源 JDBC URL（>- 为 YAML 折叠块，换行折叠为空格）
         jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_DRUID_MASTER_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_DRUID_MASTER_USERNAME: ${DB_USER}       # 应用账号 vqms_app（非 root）
       SPRING_DATASOURCE_DRUID_MASTER_PASSWORD: ${DB_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_HOST: redis          # Redis 主机 = 容器名（同网络下可直接 DNS 解析）
       SPRING_DATA_REDIS_PORT: "6379"
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
-      TOKEN_SECRET: ${JWT_SECRET}
-      RUOYI_PROFILE: /home/ruoyi/uploadPath
-      # 外部只读数据源（10.0.0.9，v3.1 §5.3）—— M1 接入 ruoyi-vqms/source 后由代码读取，此处先占位
+      TOKEN_SECRET: ${JWT_SECRET}            # JWT 签名密钥（RuoYi 登录 token 校验用）
+      RUOYI_PROFILE: /home/ruoyi/uploadPath   # RuoYi 上传根目录（与下方 volume 挂载点一致）
+      # ↓ 外部只读数据源（10.0.0.9，现 MySQL 5.7，v3.1 §5.3）：M1 接入 ruoyi-vqms/source 后由代码读取，此处先占位传参
       SOURCE_HOST: ${SOURCE_HOST}
       SOURCE_PORT: ${SOURCE_PORT}
       SOURCE_DB: ${SOURCE_DB}
       SOURCE_USERNAME: ${SOURCE_USERNAME}
       SOURCE_PASSWORD: ${SOURCE_PASSWORD}
     volumes:
-      - backend_upload:/home/ruoyi/uploadPath
-      - backend_logs:/home/ruoyi/logs
+      - backend_upload:/home/ruoyi/uploadPath  # 上传文件持久化（对应 RUOYI_PROFILE）
+      - backend_logs:/home/ruoyi/logs          # 日志持久化（容器删除后仍可查）
     ports:
-      - "7000:7000"
+      - "7000:7000"               # 后端端口直出（调试用；线上可仅走 nginx 不对外暴露）
     networks:
       - vqms-net
 
-  nginx:
-    build:
-      context: ./RuoYi-Vue3
-      dockerfile: Dockerfile
+  nginx:                          # ---- Nginx（RuoYi-Vue3 构建产物 + /prod-api 反代后端）----
+    build:                        # 本地构建前端镜像（多阶段：npm build:prod → nginx 托管 dist + 反代，见 Dockerfile）
+      context: ./RuoYi-Vue3       # 前端源码目录（含 package.json）
+      dockerfile: Dockerfile      # Dockerfile 与 package.json 同级；nginx.conf 也在该目录
     container_name: vqms-nginx
     restart: unless-stopped
     depends_on:
-      - backend
+      - backend                   # 仅顺序依赖（nginx 反代 backend，不要求其 healthy）
     ports:
-      - "8080:80"
+      - "8080:80"                 # host 8080 → 容器 80；浏览器访问 http://localhost:8080
     networks:
       - vqms-net
 
-networks:
-  vqms-net:
+networks:                         # 顶级 key：网络定义
+  vqms-net:                       # 自定义桥接网络；4 容器通过容器名互通（如 mysql:3306、redis:6379）
     driver: bridge
 
-volumes:
-  mysql_data:
-  redis_data:
-  backend_upload:
-  backend_logs:
+volumes:                          # 顶级 key：命名卷定义（docker 管理，生命周期独立于容器）
+  mysql_data:                     # MySQL 数据文件
+  redis_data:                     # Redis AOF/RDB
+  backend_upload:                 # 后端上传文件
+  backend_logs:                   # 后端日志

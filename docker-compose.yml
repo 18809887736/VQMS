@@ -32,7 +32,7 @@ services:                         # 顶级 key：定义所有服务容器
     ports:
       - "13306:3306"              # host 13306 → 容器 3306；host 侧改高端口避让本机已装的 mysql
     volumes:
-      - mysql_data:/var/lib/mysql # 数据目录持久化（named volume：容器删除后数据仍在）
+      - ./data/mysql:/var/lib/mysql # bind mount 到部署目录（~/vqms/data/mysql，路径浅可控）；启用前需 chown -R 999:999 data/mysql
       # ↓ 只读挂载 sql/ 到 mysql 官方初始化目录：首启按文件名顺序自动执行（00-*.sh 先于 *.sql）
       - ./sql:/docker-entrypoint-initdb.d:ro
       - ./mysql-charset.cnf:/etc/mysql/conf.d/charset.cnf:ro  # 强制 mysql CLI 导入 .sql 用 utf8mb4（修中文双重编码）
@@ -52,7 +52,7 @@ services:                         # 顶级 key：定义所有服务容器
     ports:
       - "16379:6379"              # host 16379 → 容器 6379；避让本机 redis
     volumes:
-      - redis_data:/data          # AOF/RDB 持久化目录
+      - ./data/redis:/data          # bind mount（~/vqms/data/redis）；启用前 chown -R 999:999 data/redis
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]  # 带密码 ping（-a 传密码）
       interval: 10s
@@ -94,8 +94,8 @@ services:                         # 顶级 key：定义所有服务容器
       SOURCE_USERNAME: ${SOURCE_USERNAME}
       SOURCE_PASSWORD: ${SOURCE_PASSWORD}
     volumes:
-      - backend_upload:/home/ruoyi/uploadPath  # 上传文件持久化（对应 RUOYI_PROFILE）
-      - backend_logs:/home/ruoyi/logs          # 日志持久化（容器删除后仍可查）
+      - ./data/upload:/home/ruoyi/uploadPath  # bind mount（~/vqms/data/upload）；chown 到 ruoyi uid（docker exec vqms-backend id ruoyi 确认）
+      - ./data/logs:/home/ruoyi/logs          # bind mount（~/vqms/data/logs）；同上 chown
     ports:
       - "7000:7000"               # 后端端口直出（调试用；线上可仅走 nginx 不对外暴露）
     networks:
@@ -118,8 +118,5 @@ networks:                         # 顶级 key：网络定义
   vqms-net:                       # 自定义桥接网络；4 容器通过容器名互通（如 mysql:3306、redis:6379）
     driver: bridge
 
-volumes:                          # 顶级 key：命名卷定义（docker 管理，生命周期独立于容器）
-  mysql_data:                     # MySQL 数据文件
-  redis_data:                     # Redis AOF/RDB
-  backend_upload:                 # 后端上传文件
-  backend_logs:                   # 后端日志
+# 所有持久化卷均用 bind mount（./data/{mysql,redis,upload,logs}），无命名卷声明。
+# 启用前需建目录并 chown：mysql/redis → 999:999；backend upload/logs → ruoyi uid（见各 service 注释）。

@@ -26,7 +26,7 @@ Built on **若依/RuoYi-Vue** (separated front/back edition, Spring Security + J
 - **Auth** — RuoYi's Spring Security + JWT, reused as-is.
 - **Backend** = RuoYi's 6 native modules (`ruoyi-admin/framework/system/quartz/generator/common`) **+ one new `ruoyi-vqms` business module** containing `source/` (external read layer), `statistics/` (qualification-rate algorithm), `ingestion/` (Quartz precompute jobs). VQMS controllers live under `com.ruoyi.web.controller.vqms`.
 - Statistics module is called **in-process** (direct method call) by both query controllers and Quartz jobs. No Feign, no gateway.
-- **Planned ports** (host:container): mysql `13306:3306`, redis `16379:6379`, backend `7000:7000`, nginx `8080:80`. API prefix `/dev-api` (RuoYi convention; Nginx strips and proxies to `backend:7000`).
+- **Planned ports** (host:container): mysql `13306:3306`, redis `16379:6379`, backend `7000:7000`, nginx `8080:80`. API prefix is env-specific (`/dev-api` in dev via vite proxy, `/prod-api` in prod via Nginx; both stripped before proxying to `backend:7000`) — see `项目规划_v3_1.md` §7.
 
 ## RuoYi reuse vs VQMS build (don't reinvent the scaffold)
 

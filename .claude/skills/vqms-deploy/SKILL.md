@@ -13,7 +13,7 @@ version: 1.1.0
 ## 前置依赖
 
 - `ssh-10-0-0-9` skill —— 本机 `~/.ssh/ssh9.sh` 封装（Windows Git Bash 非交互密码 SSH）
-- 仓库根有：`docker-compose.yml` + `RuoYi-Vue-springboot3/` + `RuoYi-Vue3/` + `.env.example`（后端 sql/ 下有 `00-create-app-user.sh` / `quartz.sql` / `ry_*.sql` / `vqms.sql`）
+- 仓库根有：`docker-compose.yml` + `RuoYi-Vue-springboot3/` + `RuoYi-Vue3/` + `.env.example`（根 `sql/` 目录下有 `00-create-app-user.sh` / `quartz.sql` / `ry_*.sql` / `vqms.sql`）
 
 ## 服务器关键信息（2026-08-03 调查，每次部署前复核）
 
@@ -43,7 +43,7 @@ mysql:
     # 绝不要 --default-authentication-plugin=mysql_native_password（8.4 坑）
   volumes:                                 # ★ mysql-charset.cnf 必须挂，挡住坑 4
     - mysql_data:/var/lib/mysql
-    - ./RuoYi-Vue-springboot3/sql:/docker-entrypoint-initdb.d:ro
+    - ./sql:/docker-entrypoint-initdb.d:ro
     - ./mysql-charset.cnf:/etc/mysql/conf.d/charset.cnf:ro
 backend:
   mem_limit: ${BACKEND_MEM_LIMIT:-1g}
@@ -71,7 +71,7 @@ default-character-set = utf8mb4
 
 ### 2. 传输源码（tar 流式；本机无 rsync）
 ```bash
-cd C:/work/VQMS && tar czf - --exclude=node_modules --exclude=target --exclude=dist --exclude=.git --exclude='*.zip' --exclude='*.log' RuoYi-Vue-springboot3 RuoYi-Vue3 docker-compose.yml .env.example mysql-charset.cnf | ~/.ssh/ssh9.sh 'mkdir -p ~/vqms && tar xzf - -C ~/vqms && echo "--- sql/ ---" && ls ~/vqms/RuoYi-Vue-springboot3/sql/ && echo "--- charset.cnf ---" && ls ~/vqms/mysql-charset.cnf'
+cd C:/work/VQMS && tar czf - --exclude=node_modules --exclude=target --exclude=dist --exclude=.git --exclude='*.zip' --exclude='*.log' RuoYi-Vue-springboot3 RuoYi-Vue3 sql docker-compose.yml .env.example mysql-charset.cnf | ~/.ssh/ssh9.sh 'mkdir -p ~/vqms && tar xzf - -C ~/vqms && echo "--- sql/ ---" && ls ~/vqms/sql/ && echo "--- charset.cnf ---" && ls ~/vqms/mysql-charset.cnf'
 ```
 预期：sql/ 下 4 个脚本（`00-create-app-user.sh` / `quartz.sql` / `ry_20260417.sql` / `vqms.sql`）。
 

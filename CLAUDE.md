@@ -7,9 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Planning/docs-only — no VQMS application code exists yet except the RuoYi scaffolding under `RuoYi-Vue-springboot3/` (backend) and `RuoYi-Vue3/` (frontend).** The target below is captured in the planning docs. When code lands, update this file with real build/test commands.
 
 - `项目规划_v3_1.md` — **authoritative** plan (v3.1, RuoYi base, **MySQL decided**). Work against this one.
-- `项目规划_v3.md` — introduced the RuoYi base but left main-DB choice open. Superseded by v3.1.
-- `项目规划_v2.md` — v2 "from-scratch monolith", PostgreSQL. Superseded by v3/v3.1.
-- `项目规划.md` — v1 microservices. Superseded.
+- `backup/项目规划_v3.md` — introduced the RuoYi base but left main-DB choice open. Superseded by v3.1.
+- `backup/项目规划_v2.md` — v2 "from-scratch monolith", PostgreSQL. Superseded by v3/v3.1.
+- `backup/项目规划.md` — v1 microservices. Superseded.
 - `his_curve_sv.md` / `his_curve_tables.md` — schema + sample data for the external source tables.
 - `tmp.md` — scratch notes; **contains plaintext DB credentials** (see Security).
 - `RuoYi-Vue-springboot3/` — backend scaffold (RuoYi-Vue, Spring Boot 3.5.14, Java 17). Base for the new `ruoyi-vqms` module.

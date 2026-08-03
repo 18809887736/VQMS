@@ -9,3 +9,6 @@ Thumbs.db
 
 # backup/ 保留脚手架原始压缩包归档（与已解压源码并存的纯净版本）
 !backup/*.zip
+
+# docker-compose 部署凭据（根目录 .env，含明文密码，绝不提交）
+/.env

@@ -18,6 +18,7 @@ services:                         # 顶级 key：定义所有服务容器
     image: mysql:8.4              # 官方镜像 8.4（RuoYi 原生，零方言迁移）
     container_name: vqms-mysql    # 固定容器名，便于日志排查
     restart: unless-stopped       # 崩溃自动重启；手动 stop 后不再拉起
+    mem_limit: ${MYSQL_MEM_LIMIT:-700m}  # 内存上限（按机器调，默认 700m，见 .env MYSQL_MEM_LIMIT）
     environment:                  # ---- 容器环境变量（mysql 官方 entrypoint + 初始化脚本读取）----
       TZ: Asia/Shanghai           # 容器时区，影响日志时间戳与数据库默认时区
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}   # root 密码：仅首启建库/建表/建应用账号用，运行时不再使用（v3.1 §9）
@@ -28,7 +29,6 @@ services:                         # 顶级 key：定义所有服务容器
     command:                      # 启动参数（追加到 mysqld 默认命令）
       - --character-set-server=utf8mb4              # 服务端默认字符集（utf8mb4 完整支持中文/emoji）
       - --collation-server=utf8mb4_general_ci       # 默认排序规则（大小写不敏感）
-      - --default-authentication-plugin=mysql_native_password  # 认证插件回退，兼容老客户端/驱动
     ports:
       - "13306:3306"              # host 13306 → 容器 3306；host 侧改高端口避让本机已装的 mysql
     volumes:
@@ -66,6 +66,7 @@ services:                         # 顶级 key：定义所有服务容器
       dockerfile: Dockerfile      # Dockerfile 与 pom.xml 同级
     container_name: vqms-backend
     restart: unless-stopped
+    mem_limit: ${BACKEND_MEM_LIMIT:-1g}  # 内存上限（按机器调，默认 1g，见 .env BACKEND_MEM_LIMIT）
     depends_on:                   # 启动依赖：等 mysql/redis 都 healthy 才起后端（避免连不上反复重试崩溃）
       mysql:
         condition: service_healthy
@@ -73,6 +74,7 @@ services:                         # 顶级 key：定义所有服务容器
         condition: service_healthy
     environment:                  # ---- Spring Boot 宽松绑定：覆盖 application*.yml 默认值，源码不改一行 ----
       TZ: Asia/Shanghai
+      JAVA_TOOL_OPTIONS: "${BACKEND_JAVA_OPTS:--Xmx512m}"  # JVM 堆（按机器调，默认 -Xmx512m，见 .env BACKEND_JAVA_OPTS）
       SERVER_PORT: "7000"         # 后端监听端口（与下方 ports、nginx 反代目标一致）
       # ↓ 连库用最小权限应用账号 DB_USER（不是 root）；v3.1 §9
       SPRING_DATASOURCE_DRUID_MASTER_URL: >-   # Druid 主数据源 JDBC URL（>- 为 YAML 折叠块，换行折叠为空格）

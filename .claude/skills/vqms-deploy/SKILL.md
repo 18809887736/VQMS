@@ -1,7 +1,7 @@
 ---
 name: vqms-deploy
 description: 把 VQMS（基于 RuoYi-Vue 的电压质量管理系统）部署或更新到 10.0.0.9 (myubuntu) 服务器。当用户提到"部署 VQMS""把 VQMS 发到服务器""在 10.0.0.9 跑 VQMS""更新 VQMS 部署""重新部署 VQMS"等时使用。覆盖前置调查、传输源码、生成 .env、分阶段构建启动、验证、回滚。硬约束：不得干扰服务器上现有的 5 个容器（mysql57 / new-api / postgres / redis / portainer）。依赖 ssh-10-0-0-9 skill（本机 ~/.ssh/ssh9.sh）。
-version: 1.1.0
+version: 1.2.0
 ---
 
 # VQMS 部署到 10.0.0.9
@@ -31,6 +31,8 @@ version: 1.1.0
 2. **`ssh9.sh` 跑长时间后台命令会挂住**：`nohup CMD >log 2>&1 &` 缺 stdin 重定向时，ssh 等待 fd 不返回，触发本地 Bash 120s 超时被移后台。**实际不影响远端 build**（build 完成后 ssh 自动释放，本地任务收到 completed 通知）。两种处理：① 命令加 `< /dev/null`（ssh 不挂，但要自己轮询进度）；② 接受挂住，等后台任务的 completed 通知即可（更简单，构建类命令推荐）。
 3. **内存偏紧**（available ~2.7 GiB）：mvn/npm 构建峰值 1–2 GB，可能挤压现有容器。务必 ① 给 mysql/backend 设 `mem_limit` + backend 设 `JAVA_TOOL_OPTIONS: "-Xmx512m"`；② **分阶段构建**（先起 mysql+redis，再 build backend，再 build nginx，串行降峰值，不要 `up --build` 一步并行构建）。
 4. **★ 中文菜单/字典变乱码（双重编码 mojibake）**：docker mysql entrypoint 用 `mysql` CLI 导入 `/docker-entrypoint-initdb.d/*.sql` 时 CLI 默认 `character_set_client=latin1`（即使配了 `--character-set-server=utf8mb4` 也管不到 CLI），UTF-8 的 `ry_*.sql` 中文被当 latin1 解码再以 utf8mb4 存储 → 入库即脏（页面"系统管理"变 `è‹¥ä¾é¡¹ç®¡...`）。**判断**：`SELECT HEX(menu_name) FROM sys_menu LIMIT 3`——正常应 `E7B3BBE7BB9F...`，双重编码是 `C3A7C2B3...`。**修复**：挂载 `[mysql] default-character-set=utf8mb4` 客户端配置（见必备项），删 mysql 卷重新初始化（脏数据无法应用层修补）。注意 `--character-set-server=utf8mb4` 只让库表字符集正确，**挡不住导入 CLI 的 latin1**。
+5. **bind mount 目录 chown 权限**：宿主普通用户（syth）无 `CAP_CHOWN`，`chown -R 999:999 data/mysql` 报 `Operation not permitted`。改用容器内 root chown：`docker run --rm -v ~/vqms/data:/d alpine sh -c "chown -R 999:999 /d/mysql /d/redis && chown -R 100:101 /d/upload /d/logs"`（uid 以 `docker exec <容器> id <user>` 确认为准：mysql/redis=999，ruoyi=100:101）。**mysql/redis 官方镜像 entrypoint 也能自动 chown 自己的 datadir，但 backend 的 upload/logs（USER ruoyi）不会，必须显式 chown。**
+6. **迁移/更新漏传 `sql/` → mysql 不建账号不建表**：只传 `docker-compose.yml` 而不传 `sql/` 目录 → mysql 挂载空 `./sql`，entrypoint 没脚本可跑 → `vqms_app` 账号和 `sys_*`/`voltage_quality_*` 表全没建 → backend `Access denied for user 'vqms_app'` 反复 restart（**mysql 却 healthy，迷惑性强**）。**判断**：`docker compose exec mysql mysql -u$DB_USER -p$DB_PASSWORD ry_vqms -e "show tables;"` 返回空或 Access denied。**修复**：确保 `sql/`（4 脚本）在 compose 同目录，清空 `data/mysql` 后重导。首次部署按步骤 2 完整 tar 传不会漏（清单含 `sql`）；只在"单独传 compose"时踩。
 
 ## docker-compose.yml 必备项（本机源头要配对）
 
@@ -41,9 +43,9 @@ mysql:
     - --character-set-server=utf8mb4
     - --collation-server=utf8mb4_general_ci
     # 绝不要 --default-authentication-plugin=mysql_native_password（8.4 坑）
-  volumes:                                 # ★ mysql-charset.cnf 必须挂，挡住坑 4
-    - mysql_data:/var/lib/mysql
-    - ./sql:/docker-entrypoint-initdb.d:ro
+  volumes:                                 # ★ charset.cnf 必须挂（坑 4）；mysql 用 bind mount（坑 5 chown）
+    - ./data/mysql:/var/lib/mysql          # bind mount 到部署目录（需 chown 999:999，坑 5）
+    - ./sql:/docker-entrypoint-initdb.d:ro # ★ sql/ 必须同目录（坑 6，否则不建账号建表）
     - ./mysql-charset.cnf:/etc/mysql/conf.d/charset.cnf:ro
 backend:
   mem_limit: ${BACKEND_MEM_LIMIT:-1g}

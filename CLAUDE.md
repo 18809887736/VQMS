@@ -62,4 +62,4 @@ These constraints come from the source schema and are non-obvious — they affec
 ## Security
 
 - `tmp.md` committed **plaintext DB credentials** (MySQL root password, host). Before this repo is ever made public: scrub the password from git history and rotate it. Do not add new secrets to tracked files.
-- `.env` (planned) must never be committed — it holds external-source connection strings, MySQL root password, Redis address, JWT secret.
+- `.env` (planned) must never be committed — it holds external-source connection strings, MySQL root password (init only), app DB account credentials, Redis address, JWT secret. **App runtime connects via a least-privilege account (e.g. `vqms_app`), not root** — root is for first-time init only (create DB/tables, `CREATE USER` + `GRANT`); see `项目规划_v3_1.md` §9 for the account-split setup.

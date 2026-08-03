@@ -89,3 +89,8 @@ create table precompute_cursor (
   updated_at datetime default current_timestamp on update current_timestamp comment '更新时间',
   primary key (busbar_num)
 ) engine=innodb comment = '预计算游标';
+
+-- 关闭登录验证码（VQMS 定制：覆盖 ry_*.sql 的默认 true）
+-- 按 CLAUDE.md "不改 RuoYi 原生模块"，不直接改 ry_20260417.sql，而在本脚本末尾覆盖
+-- 首启执行顺序 00-create-app-user.sh → quartz.sql → ry_*.sql → vqms.sql，本 UPDATE 最后跑，覆盖 ry 初始值
+UPDATE sys_config SET config_value = 'false' WHERE config_key = 'sys.account.captchaEnabled';

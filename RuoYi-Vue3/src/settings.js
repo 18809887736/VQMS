@@ -62,6 +62,6 @@ export default {
   /**
    * 底部版权文本内容
    */
-  footerContent: 'Copyright © 2026 VQMS. All Rights Reserved.'
+  footerContent: `Copyright © ${new Date().getFullYear()} VQMS. All Rights Reserved.`
 }
 

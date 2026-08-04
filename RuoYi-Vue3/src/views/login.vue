@@ -171,8 +171,10 @@ getCookie()
   justify-content: center;
   align-items: center;
   height: 100%;
-  background-image: url("../assets/images/login-background.jpg");
-  background-size: cover;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.10), transparent 42%),
+    radial-gradient(circle at 82% 78%, rgba(0, 0, 0, 0.12), transparent 45%),
+    linear-gradient(135deg, #0b3d91 0%, #1e6fb8 50%, #00a8cc 100%);
 }
 .title {
   margin: 0px auto 30px auto;
@@ -230,7 +232,9 @@ getCookie()
 }
 
 html.dark .login {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("../assets/images/login-background.jpg");
+  background:
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.06), transparent 42%),
+    linear-gradient(135deg, #072a5e 0%, #103e72 50%, #007a9e 100%);
   .login-form {
     background: var(--el-bg-color-overlay) !important;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);

@@ -1,5 +1,12 @@
 -- ============================================================
 -- VQMS 电压质量监测系统 - 建表脚本 (v3.2)
+--
+-- ⚠️⚠️ 破坏性脚本，严禁对已有数据的环境重复执行 ⚠️⚠️
+--   每张表开头都是 DROP TABLE IF EXISTS——重跑会清空重建：
+--   busbar / busbar_group / busbar_threshold / yc_point_map 等人工维护的配置表
+--   会回到初始种子数据，现场已录入的母线（如 500kV）、调整过的容差、补录的点位全部丢失。
+--   仅限全新部署首启执行；线上变更表结构请用 ALTER 或增量迁移脚本，勿整脚本重跑。
+--
 -- 与 RuoYi sys_* 表同库；库名由 docker MYSQL_DATABASE 决定，本脚本不含 CREATE DATABASE/USE
 -- 首启执行顺序：00-create-app-user.sh → quartz.sql → ry_*.sql → vqms.sql（末尾 UPDATE 覆盖 ry 默认值）
 --

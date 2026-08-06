@@ -17,6 +17,7 @@
 --   * voltage_quality_daily / monthly / yearly 三表均加 excluded_minutes 列（§5.7.1 对账等式 total + excluded）
 --   * 所有 busbar_num 由 smallint 改为 bigint(20)，对齐外部源 his_curve_sv.busbar_num 真实类型
 --   * voltage_quality_group_daily（§5.7.5）M2+ 待补，本脚本暂注释不执行
+--   * precompute_cursor PK 由 busbar_num 改为 group_num（§5.7.3 rollup 按组推进；游标推进与组内日表 UPSERT 同事务，避免组内母线游标分叉）
 -- ============================================================
 
 
@@ -196,15 +197,16 @@ create table voltage_quality_yearly (
 
 
 -- ============================================================
--- 三、预计算游标（v3.1 §5.2；断点续算/全量回填，按组推进、组内母线同批算 §5.7.3）
+-- 三、预计算游标（按组；§5.7.3 rollup 单元=组 → 游标 PK=group_num，非按母线；v3.1 §5.2 的按母线游标已废弃）
 -- ============================================================
 drop table if exists precompute_cursor;
 create table precompute_cursor (
-  busbar_num bigint(20) not null                                   comment '母线编号，对齐 his_curve_sv.busbar_num',
-  last_date  date       default null                               comment '最后已计算日期',
+  group_num  bigint(20) not null                                   comment '母线组编号，对齐 busbar_group.group_num（§5.7.3 rollup 按组推进，非按母线）',
+  last_date  date       default null                               comment '该组最后已计算日期（组内全部母线同批完成）',
   updated_at datetime   default current_timestamp on update current_timestamp comment '更新时间',
-  primary key (busbar_num)
-) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='预计算游标';
+  primary key (group_num)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='预计算游标（按组）';
+-- 游标推进须与"该组当天日表 UPSERT（组内全部母线）"包在同一事务：整批成功→游标前挪一天；失败→全回滚、游标不动、下次重跑整批。避免按母线记游标时组内两条母线 last_date 分叉的中间态。
 
 
 -- ============================================================

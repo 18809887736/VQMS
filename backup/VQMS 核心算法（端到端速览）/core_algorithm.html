@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>VQMS 核心算法</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 32px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #f4f6fa; color: #1f2937;
+    width: 1320px;
+  }
+  .card {
+    background: #fff; border: 1px solid #e3e8ef; border-radius: 10px;
+    padding: 26px 34px; box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  }
+  h1 {
+    font-size: 22px; margin: 0 0 4px; color: #0b3d91;
+    border-bottom: 2px solid #0b3d91; padding-bottom: 8px;
+  }
+  .sub { color: #6b7280; font-size: 12.5px; margin: 0 0 18px; }
+  h2 { font-size: 15px; margin: 18px 0 8px; color: #0b3d91; }
+  p { margin: 6px 0; font-size: 13px; line-height: 1.7; }
+  code, .mono { font-family: Consolas, "Courier New", monospace; }
+  code {
+    background: #f1f3f9; padding: 1px 5px; border-radius: 3px;
+    font-size: 12.5px; color: #b21f1f;
+  }
+  .formula { font-size: 13.5px; line-height: 1.8; }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 14px 18px;
+    border-radius: 6px; font-size: 12.5px; line-height: 1.75;
+    overflow-x: auto; margin: 8px 0;
+  }
+  pre .c { color: #94a3b8; }
+  pre .k { color: #7dd3fc; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12.5px; }
+  th, td { border: 1px solid #d6dbe5; padding: 7px 10px; text-align: left; vertical-align: top; line-height: 1.6; }
+  th { background: #eef2fb; color: #0b3d91; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfd; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { font-size: 13px; line-height: 1.8; margin: 3px 0; }
+  .tag { display:inline-block; background:#0b3d91; color:#fff; font-size:11px; padding:1px 7px; border-radius:3px; margin-right:6px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+<h1>🧮 VQMS 核心算法（端到端速览）</h1>
+<p class="sub">一屏看全「原始曲线 → 日/月/年合格率」。细节/边界防御/为什么见 项目规划_v3_2.md §5.5–§5.7。</p>
+
+<h2>判定公式（AVC 口径，§2.2 / §5.3）</h2>
+<p class="formula"><code>dev = average_SV − plan_SV</code>；<code>|dev| ≤ tolerance_v</code> → <b>合格</b>（含边界）；<code>dev &gt; +tol</code> → <b>偏高</b>（over_high）；<code>dev &lt; −tol</code> → <b>偏低</b>（over_low）。容差随阈值行生效：220kV=±300V、500kV=±500V。</p>
+
+<h2>端到端流水线（每日 stat_date 次日调度，按组 group_num 推进；游标 precompute_cursor 按组、与组内日表 UPSERT <b>同事务</b>）</h2>
+<pre><span class="c">① 取数（两路独立，边界放宽 ±1 天，§5.7.3 ①-a 三步闸门：正则→解析→真实时间过滤）</span>
+   电压路 <span class="k">his_curve_sv</span>(该组全部 busbar_num)  ;  yx 路 <span class="k">yc_history</span>(指示点 + 门控点)
+<span class="c">② 时间对齐到分钟（§5.5）</span>
+   电压桶 (t × busbar_num)：多条→avg 均值、plan 末条；缺→标记
+   yx 桶 (t)：取 ≤ t 最近一条（阶跃保持）
+<span class="c">③ 逐对齐分钟 t：</span>
+   <b>层 0</b> §5.1.1 判主母线 mainBusbarNum(t)（整组一次；失效→组级空档，不计任何母线）
+   仅对 busbar_num = mainBusbarNum(t) 跑三关（§5.7.2）：
+     <b>层 1</b> 门控关  → 命中剔除(excluded)
+     <b>层 2</b> 数据关  → plan 废值按 plan_sv_invalid_policy：SKIP 剔除 / COUNT 不合格 / FALLBACK 回退
+     <b>层 3</b> 合格关  → 合格 / 偏高 / 偏低
+<span class="c">④ 组内每条 busbar_num UPSERT voltage_quality_daily</span>
+<span class="c">⑤ 月/年（§5.7.4）：daily→monthly→yearly，纯加权 SUM，沿用 v3.1 §6.3</span></pre>
+
+<h2>四层判定速查（§5.7.3，层 0 先于三关）</h2>
+<table>
+<tr><th>层</th><th>判什么</th><th>不通过归宿</th></tr>
+<tr><td><b>0 主母线归属</b><br>（§5.1.1，组级）</td><td>该分钟主母线是哪条</td><td>是副母线→<b>跳过</b>（不在窗口，不计 total/excluded）；失效→组级空档</td></tr>
+<tr><td><b>1 门控关</b>（§5.4）</td><td>装置退出？（远方就地=0 / AVC 退）</td><td>命中→<b>剔除</b>（excluded）</td></tr>
+<tr><td><b>2 数据关</b>（§5.3）</td><td>plan_SV 废/缺值？</td><td>SKIP→<b>剔除</b>(excluded)；COUNT→不合格；FALLBACK→回退判</td></tr>
+<tr><td><b>3 合格关</b>（§5.3 AVC）</td><td><code>|avg−plan|</code> 超容差？</td><td>合格 / 偏高 / 偏低</td></tr>
+</table>
+
+<h2>合格率与对账（§5.6 / §5.7.1）</h2>
+<ul>
+<li>日：<code>qualification_rate = qualified / total × 100</code>，<code>total = qualified + over_high + over_low</code></li>
+<li><code>total + excluded = 该母线当天充当主母线的全部分钟</code>（excluded 只含层 1/2 剔除，<b>不含</b>层 0 跳过与组级空档）</li>
+<li>月/年：<code>rate = SUM(qualified) / SUM(total) × 100</code>（<b>绝不直接 AVG rate 列</b>）；<code>avg_SV</code> 按 <code>total</code> 加权；<code>excluded = SUM(excluded)</code></li>
+</ul>
+
+<h2>实现形态</h2>
+<p>Java 编排（<code>ruoyi-vqms/statistics</code>，挂 RuoYi Quartz，v3.1 §6.4）——主母线判定 + 三关是过程式逻辑，拆成「取数 SQL + 逐分钟判定 + UPSERT」，<b>非单条</b> <code>INSERT...SELECT</code>。</p>
+
+</div>
+</body>
+</html>

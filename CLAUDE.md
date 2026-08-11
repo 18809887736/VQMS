@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Address the user as "Leo" — every session, every response, by name.**
+
 ## Repository state
 
 **Planning/docs-only — no VQMS application code exists yet except the RuoYi scaffolding under `RuoYi-Vue-springboot3/` (backend) and `RuoYi-Vue3/` (frontend).** The target below is captured in the planning docs. When code lands, update this file with real build/test commands.

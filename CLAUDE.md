@@ -49,6 +49,26 @@ This is about the **external source** — independent of the (decided) MySQL mai
 - Selection via config: `source.type=mysql57|mysql8|sqlite|postgres` + `source.driver` / `source.url` in `.env`/`sys_config`. Switching = change config + swap impl Bean; statistics and web code unchanged.
 - Only generic SQL (`SELECT ... WHERE save_time BETWEEN ? AND ? AND busbar_num = ?`); no DB-specific constructs.
 
+## AVC 考核规定 —— VQMS 实现依据
+
+VQMS 的考核功能以《东北区域电力并网运行管理实施细则》《东北区域电力辅助服务管理实施细则》**附件6「AVC 装置技术指标要求及考核规定」**（东北能源监管局 2024-09-04 印发，p47–48）为政策依据。原文存档于 `docs/政策口径/AVC 装置技术指标要求及考核规定.md`。三个考核维度均为 VQMS 实现目标：
+
+1. **AVC 装置投运率** = 投运时间 / 并网运行时间 × 100%，合格 **≥99%**（扣除电网原因退出时间）。
+2. **AVC 装置调节合格率** = 执行合格点数 / 发令次数 × 100%，合格 **≥100%**；调度电压/无功指令下达后，AVC 装置须在 **1 分钟内**调整到合格区间。
+3. **免考**：已纳入 AVC 闭环的全部无功设备按最大发/吸能力参与仍不达标 → 该时段免于考核。
+
+**考核单价**（投运率、调节合格率缺额通用）：每缺 1 个百分点 = 额定容量 × **0.02 分/万千瓦**，线性（非分档）。
+
+**合格区间（电压调整允许偏差）= VQMS `tolerance_v` 容差权威值：**
+
+| 电压等级 | 允许偏差 |
+|---|---|
+| 500 kV | ±1.5 kV (±1500 V) |
+| 220 kV | ±1 kV (±1000 V) |
+| 66 kV 及以下 | ±1% 额定电压 |
+
+> ⚠️ v3.4 §5.2 `busbar_threshold.tolerance_v` 现填 220kV=300V / 500kV=500V **为误值**，须据上表更正为 1000V / 1500V。
+
 ## Voltage-quality algorithm & source-data quirks
 
 These constraints come from the source schema and are non-obvious — they affect every query and calculation:

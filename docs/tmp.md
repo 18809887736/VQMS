@@ -4,7 +4,7 @@
 
 数据 的源头 ：
 
-1.调度的 指令问题：
+1.调度的指令问题：
 
 warn_info  
 
@@ -40,7 +40,15 @@ warn_type   ,  obj_num ,  目标值  或  增量值
 
 
 
+注：不在  his_curve_sv的  plan_SV获得 
 
+2. 主母线号问题：
+
+   yc_history表
+
+   yc_num   通常 为   现场人员 整定
+   yc_time
+   yc_data   主母线号   0    1  之类
 
 
 

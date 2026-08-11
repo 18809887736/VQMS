@@ -6,6 +6,8 @@
 
 1.调度的指令问题：
 
+电压或无功指令     本项目  暂时 只考虑 电压指令，无功指令  也 留有接口  以便  以后开发。
+
 warn_info  
 
    warn_type  通常 为  5  现场人员 整定
@@ -49,6 +51,14 @@ warn_type   ,  obj_num ,  目标值  或  增量值
    yc_num   通常 为   现场人员 整定
    yc_time
    yc_data   主母线号   0    1  之类
+
+3. 实时母线电压记录 
+
+   yc_history表
+
+   yc_num   通常 为   现场人员 整定
+   yc_time
+   yc_data   234.25   之类
 
 
 

@@ -49,6 +49,20 @@ This is about the **external source** — independent of the (decided) MySQL mai
 - Selection via config: `source.type=mysql57|mysql8|sqlite|postgres` + `source.driver` / `source.url` in `.env`/`sys_config`. Switching = change config + swap impl Bean; statistics and web code unchanged.
 - Only generic SQL (`SELECT ... WHERE save_time BETWEEN ? AND ? AND busbar_num = ?`); no DB-specific constructs.
 
+## 单位规约（Unit conventions）
+
+VQMS 全项目统一采用以下规范单位，字段、计算、文档、UI 展示均以此为准：
+
+| 量 | 规范单位 | 存储 | 说明 |
+|---|---|---|---|
+| 电压（`average_SV` / `high_SV` / `low_SV` / `plan_SV` / `nominal_kv` / `tolerance_v`） | **kV** | decimal | 源数据即为整数 kV（220kV 母线 `average_SV`≈234）；`tolerance_v` 用 `decimal(10,3)` 存（1.000 / 1.500） |
+| 无功功率 | **kvar** | decimal | 引用 AVC 规定原文时照录"万千乏"（1 万千乏 = 10000 kvar） |
+| 有功 / 容量 | **kW** | decimal | 引用原文时照录"万千瓦" |
+| 合格率 / 投运率 | **%** | decimal | 聚合按分钟数加权，**绝不直接平均率列** |
+| 时间（聚合） | **分钟数** | int | 各统计粒度记合格 / 不合格 / 剔除分钟计数 |
+
+**关键一致性**：阈值公式 `|average_SV − plan_SV| ≤ tolerance_v` 三者必须同单位（kV）。源 SV 字段读入后**不做单位换算**（原值即 kV）。`yc_history` 模拟量按 `yc_point_map.unit` 标注，纳入统计前归一到规范单位。
+
 ## AVC 考核规定 —— VQMS 实现依据
 
 VQMS 的考核功能以《东北区域电力并网运行管理实施细则》《东北区域电力辅助服务管理实施细则》**附件6「AVC 装置技术指标要求及考核规定」**（东北能源监管局 2024-09-04 印发，p47–48）为政策依据。原文存档于 `docs/政策口径/AVC 装置技术指标要求及考核规定.md`。三个考核维度均为 VQMS 实现目标：
@@ -67,7 +81,7 @@ VQMS 的考核功能以《东北区域电力并网运行管理实施细则》《
 | 220 kV | ±1 kV (±1000 V) |
 | 66 kV 及以下 | ±1% 额定电压 |
 
-> ⚠️ v3.4 §5.2 `busbar_threshold.tolerance_v` 现填 220kV=300V / 500kV=500V **为误值**，须据上表更正为 1000V / 1500V。
+> ✅ v3.4 §5.2 `busbar_threshold.tolerance_v` 已据此更正并统一为 kV：原误值 220kV=300 / 500kV=500（int 伏特）已改为 `decimal(10,3)` kV，值 **1.000 / 1.500**。
 
 ## Voltage-quality algorithm & source-data quirks
 

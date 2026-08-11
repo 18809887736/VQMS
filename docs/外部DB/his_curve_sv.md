@@ -12,16 +12,17 @@
 CREATE TABLE `his_curve_sv` (
   `save_time`    varchar(255) DEFAULT NULL,   -- 存盘时间 (例: 2026-07-30 16:06:00.4)
   `busbar_num`   bigint(20)   DEFAULT NULL,   -- 母线编号 (0 / 1)
-  `high_SV`      decimal(10,0) DEFAULT NULL,  -- 电压上限
-  `low_SV`       decimal(10,0) DEFAULT NULL,  -- 电压下限
-  `average_SV`   decimal(10,0) DEFAULT NULL,  -- 电压平均值
-  `plan_SV`      decimal(10,0) DEFAULT NULL   -- 计划电压值 (原始遥测编码)
+  `high_SV`      decimal(10,0) DEFAULT NULL,  -- 电压上限(kV)
+  `low_SV`       decimal(10,0) DEFAULT NULL,  -- 电压下限(kV)
+  `average_SV`   decimal(10,0) DEFAULT NULL,  -- 电压平均值(kV)
+  `plan_SV`      decimal(10,0) DEFAULT NULL   -- 计划电压值(kV，原始遥测编码)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 ```
 
 - **主键/索引**: 无
 - **数据量**: 8,225 行 (2026-07-30)
 - **写入频率**: 约 1 分钟/条，每次双写母线 0 和 1
+- **单位**：`high_SV` / `low_SV` / `average_SV` / `plan_SV` 均为 **kV**（整数 `decimal(10,0)`）。如 220kV 母线 `average_SV`≈234。样例 `plan_SV=10245` 为废值。
 
 ### 字段说明
 

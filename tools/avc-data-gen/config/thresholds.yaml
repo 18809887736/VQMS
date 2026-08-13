@@ -1,0 +1,17 @@
+# VQMS AVC 合成数据生成器配置 —— 阈值与全局参数
+# 依据 docs/AVC考核核心算法_草稿.md §2.4.1（整定参数）+ 附件6 考核单价
+
+t_fast_min: 5              # 快速性档窗口上界（草稿 §2.4.1 默认 5min，现场可整定）
+t_econ_min: 30             # 经济性档窗口上界（草稿标"待定"，Leo 定 30min —— 无上界会导致长越限永远合格）
+
+rated_capacity_kw: 600000  # 并网主体总额定容量（2×300MW = 600000 kW，定值）
+penalty_unit: 0.02         # 考核单价：分/万千瓦/百分点（附件6）
+uptime_target: 0.99        # 投运率合格线 ≥99%
+
+base_date: "2026-03-15"    # 场景基准日（避开真实 dump 时段 2021-05 / 2026-07，防排序冲突）
+
+# 电压基线（220kV 母线，整数 kV；SV 字段是 decimal(10,0)）
+default_busbar_pair: [0, 1]        # his_curve_sv 每分钟双写的母线号
+default_v_grade_220kv_nominal: 220
+default_realtime_v_220kv: 234.25   # 增量指令拼接用的实时电压基线（带小数，yc_history.yc_data 是 double）
+plan_sv_discard: 10245             # plan_SV 废值（写入作干扰，验证算法不读它）

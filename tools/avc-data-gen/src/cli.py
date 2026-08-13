@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -31,6 +31,18 @@ def _load_config() -> ScenarioConfig:
     thresholds = yaml.safe_load((_CONFIG_DIR / "thresholds.yaml").read_text(encoding="utf-8"))
     base_date = datetime.strptime(thresholds["base_date"], "%Y-%m-%d")
     return ScenarioConfig(points=points, thresholds=thresholds, base_date=base_date)
+
+
+def _build_with_offset(scenario, cfg: ScenarioConfig, index: int) -> "ScenarioBundle":
+    """构建场景，base_date 按序号偏移 index 天。
+
+    每个场景独占一天，避免多个场景共用同一 (yc_num, yc_time) 撞 yc_history 的 UNIQUE 约束
+    （合并导入到同库时必需）。split 单文件模式不受影响，但统一偏移保持一致。
+    """
+    from copy import copy
+    cfg_off = copy(cfg)
+    cfg_off.base_date = cfg.base_date + timedelta(days=index)
+    return scenario.build(cfg_off)
 
 
 def _find_scenario(sid: str):
@@ -82,8 +94,8 @@ def main(argv=None) -> int:
 
     if args.cmd == "manifest":
         items = []
-        for s in ALL_SCENARIOS:
-            b = s.build(cfg)
+        for i, s in enumerate(ALL_SCENARIOS):
+            b = _build_with_offset(s, cfg, i)
             items.append({"id": b.scenario_id, "description": b.description,
                           "expected": b.expected})
         out = Path(args.out)
@@ -94,7 +106,9 @@ def main(argv=None) -> int:
 
     if args.cmd == "gen":
         selected = _select(args.group, args.scenario)
-        bundles = [s.build(cfg) for s in selected]
+        # 全局序号偏移（与 manifest 一致），保证同组内 base_date 不撞、与 all 模式一致
+        global_index = {id(s): i for i, s in enumerate(ALL_SCENARIOS)}
+        bundles = [_build_with_offset(s, cfg, global_index[id(s)]) for s in selected]
         if args.split:
             out_dir = Path(args.out)
             out_dir.mkdir(parents=True, exist_ok=True)

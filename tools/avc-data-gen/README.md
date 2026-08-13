@@ -90,16 +90,16 @@ python -m src.cli gen --group uptime --out output/all_uptime.sql
 # 2. 传服务器（密码从环境变量 MYSQL57_ROOT_PW 读，勿明文传）
 scp output/00-schema.sql output/all_*.sql syth@10.0.0.9:~/vqms-avc-test/
 
-# 3. 导入（mysql57 容器）
-ssh syth@10.0.0.9 'docker exec -i mysql57 mysql -uroot -p"$MYSQL57_ROOT_PW" \
-    -e "CREATE DATABASE IF NOT EXISTS vqms_avc_test DEFAULT CHARSET utf8;"'
-ssh syth@10.0.0.9 'docker exec -i mysql57 mysql -uroot -p"$MYSQL57_ROOT_PW" \
+# 3. 导入（mysql57 容器，须加 --default-character-set=utf8mb4 否则中文 warn_info 乱码）
+ssh syth@10.0.0.9 'docker exec -i mysql57 mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL57_ROOT_PW" \
+    -e "CREATE DATABASE IF NOT EXISTS vqms_avc_test DEFAULT CHARSET utf8mb4;"'
+ssh syth@10.0.0.9 'docker exec -i mysql57 mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL57_ROOT_PW" \
     vqms_avc_test < ~/vqms-avc-test/00-schema.sql'
-ssh syth@10.0.0.9 'docker exec -i mysql57 mysql -uroot -p"$MYSQL57_ROOT_PW" \
+ssh syth@10.0.0.9 'docker exec -i mysql57 mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL57_ROOT_PW" \
     vqms_avc_test < ~/vqms-avc-test/all_regulation.sql'
 
 # 4. 验证行数
-ssh syth@10.0.0.9 'docker exec -i mysql57 mysql -uroot -p"$MYSQL57_ROOT_PW" vqms_avc_test \
+ssh syth@10.0.0.9 'docker exec -i mysql57 mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL57_ROOT_PW" vqms_avc_test \
     -e "SELECT (SELECT COUNT(*) FROM his_curve_sv) sv, (SELECT COUNT(*) FROM warn_info) warn, (SELECT COUNT(*) FROM yc_history) yc;"'
 
 # 清理重跑

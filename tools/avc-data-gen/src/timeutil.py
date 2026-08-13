@@ -21,14 +21,16 @@ def round_to_minute(dt: datetime) -> datetime:
     return dt.replace(second=0, microsecond=0)
 
 
-def format_sv_save_time(dt: datetime, millis_frac: str = ".0") -> str:
-    """his_curve_sv.save_time 格式：'2026-03-15 10:04:23.4'（亚秒一位小数，仿真实 dump）。"""
-    return f"{dt.strftime(FMT)}{millis_frac}"
+def format_sv_save_time(dt: datetime) -> str:
+    """his_curve_sv.save_time 格式：'2026-03-15 10:00:57.556'（亚秒三位毫秒，仿真实 dump）。"""
+    ms3 = dt.microsecond // 1000
+    return f"{dt.strftime(FMT)}.{ms3:03d}"
 
 
-def format_warn_time(dt: datetime, millis_frac: str = ".0") -> str:
-    """warn_info.warn_time 格式：同 save_time，亚秒一位。"""
-    return f"{dt.strftime(FMT)}{millis_frac}"
+def format_warn_time(dt: datetime) -> str:
+    """warn_info.warn_time 格式：同 save_time，亚秒三位毫秒。"""
+    ms3 = dt.microsecond // 1000
+    return f"{dt.strftime(FMT)}.{ms3:03d}"
 
 
 def format_millisecond(dt: datetime) -> str:
@@ -36,9 +38,23 @@ def format_millisecond(dt: datetime) -> str:
     return f"{dt.microsecond // 1000:03d}"
 
 
-def format_yc_time(dt: datetime, millis_frac: str = ".0") -> str:
-    """yc_history.yc_time 格式：同 save_time，亚秒一位。"""
-    return f"{dt.strftime(FMT)}{millis_frac}"
+def format_yc_time(dt: datetime) -> str:
+    """yc_history.yc_time 格式：同 save_time，亚秒三位毫秒。"""
+    ms3 = dt.microsecond // 1000
+    return f"{dt.strftime(FMT)}.{ms3:03d}"
+
+
+def jitter_save_time(dt_minute: datetime, variant: int = 0) -> datetime:
+    """给目标分钟加亚秒偏离，仿真实 his_curve_sv 的 '15:27:57.556' 模式。
+
+    返回 = 目标分钟**前一分钟**的 57/58 秒 + 毫秒；就近取整（秒 ≥ 30 进位）后回到目标分钟。
+    variant 让双写母线 0/1 与连续点的时间戳略不同（仿真实采集：同周期母线 0/1 差几十毫秒）。
+    判定侧必须先就近取整，才能把该点归到正确分钟——这正是 jitter 的测试价值。
+    """
+    prev = dt_minute.replace(second=0, microsecond=0) - timedelta(minutes=1)
+    sec = 57 + (variant % 2)               # 57 或 58 秒（≥30 → 取整进位到目标分钟）
+    ms = (variant * 137) % 900 + 100        # 100~999 毫秒（确定性，不依赖随机）
+    return prev + timedelta(seconds=sec, milliseconds=ms)
 
 
 def at_minute(base: datetime, *, days: int = 0, hour: int, minute: int,

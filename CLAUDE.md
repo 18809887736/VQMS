@@ -6,48 +6,57 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-**Planning/docs-only — no VQMS application code exists yet except the RuoYi scaffolding under `RuoYi-Vue-springboot3/` (backend) and `RuoYi-Vue3/` (frontend).** The target below is captured in the planning docs. When code lands, update this file with real build/test commands.
+**规划 + 前端骨架阶段。** RuoYi 脚手架已就位（`RuoYi-Vue-springboot3/` 后端、`RuoYi-Vue3/` 前端），VQMS 前端业务页面骨架已落地（`RuoYi-Vue3/src/views/vqms/` 下 7 个页面：curve / daily / monthly / yearly / avc-runtime / avc-regulation / threshold）；后端 `ruoyi-vqms` 业务模块尚未落地。后端代码落地后，在此补真实 build/test 命令。
 
-- `项目规划_v3_1.md` — **authoritative** plan (v3.1, RuoYi base, **MySQL decided**). Work against this one.
-- `backup/项目规划_v3.md` — introduced the RuoYi base but left main-DB choice open. Superseded by v3.1.
-- `backup/项目规划_v2.md` — v2 "from-scratch monolith", PostgreSQL. Superseded by v3/v3.1.
-- `backup/项目规划.md` — v1 microservices. Superseded.
-- `his_curve_sv.md` / `his_curve_tables.md` — schema + sample data for the external source tables.
-- `tmp.md` — scratch notes; **contains plaintext DB credentials** (see Security).
-- `RuoYi-Vue-springboot3/` — backend scaffold (RuoYi-Vue, Spring Boot 3.5.14, Java 17). Base for the new `ruoyi-vqms` module.
-- `RuoYi-Vue3/` — frontend scaffold (Vue 3 + Element Plus + Vite).
-- Docs and UI are in Chinese; the domain is Chinese power-utility AVC / substation busbar voltage.
+### 权威文档与版本演进链
 
-## Architecture (v3.1 — RuoYi-Vue base, MySQL decided)
+规划文档按版本迭代，**只看最新一版**。演进链：v1（微服务）→ v2（自研单体/PG）→ v3（RuoYi 底座，主库未定）→ v3.1（RuoYi + MySQL 定案）→ v3.2（辨析国标区间 vs AVC 控制目标）→ v3.3（统计单元/桶，**已撤销**）→ **v3.4（现行权威）**。底座、DDL、外部源规格自 v3.1 起一致，v3.4 相对 v3.2 无判定层变更（仅撤销 v3.3 的桶设计）。
 
-Built on **若依/RuoYi-Vue** (separated front/back edition, Spring Security + JWT + Redis) — NOT the v2 from-scratch monolith, and NOT `y_project/RuoYi` (Shiro + Thymeleaf single-app). Deployed as **4 Docker Compose containers**: `mysql`, `redis`, `backend`, `nginx`.
+| 文档 | 位置 | 状态 |
+|---|---|---|
+| **项目规划_v3_4.md** | `docs/项目规划_v3_4.md` | ✅ **权威**，以此为准 |
+| 项目规划 v3.1 / v3.2 / v3.3 | `backup/` | Superseded（v3.1 定 MySQL；v3.2 增区间辨析；v3.3 桶设计已撤销） |
+| 项目规划 v1 / v2 | `backup/` | Superseded（微服务 / 自研单体+PG） |
+| AVC考核核心算法_草稿.md | `docs/AVC考核核心算法_草稿.md` | ✅ **算法权威**（2026-08-13 Leo 拍板以此为准），含投运率(§一)+调节合格率(§二)+两档平行模型(§2.4–2.7)。草稿自述仍待真实数据定稿，但**判定口径以此为准**，v3.4 的 `average_SV` 旧模型已被 supersede |
+| 外部数据源.md | `docs/外部数据源.md` | 外部库字段语义权威 |
+| 核心算法流程图（含通俗版） | `docs/核心算法流程图/` | 辅助理解，以规划文档为准 |
+| 政策口径（附件6、分档考核、免考） | `docs/政策口径/` | AVC 考核政策原文 |
+| 前端规划与实施路径.md | `docs/前端/` | 前端落地节奏 |
+| 部署 / 迁移 / 品牌去除计划 | `docs/` | 运维与改造 |
+| 外部 DB 表 schema + 样例 | `docs/外部DB/` | 含 `his_curve_sv.md` 等 |
 
-- **MySQL 8.4** — the *only* persistent store (main DB). Holds RuoYi `sys_*` management tables **and** VQMS `voltage_quality_*` derived statistics. Must **never** store raw business data. (v2 chose PostgreSQL; v3.1 overrode it because RuoYi is MySQL-native — zero dialect/script migration.)
-- **Redis** — required by RuoYi (login tokens, captcha, rate-limit, dict/config cache). v2 had no Redis; v3.1 accepts it as RuoYi's cost of entry.
-- **External source** — read-only business data (`his_curve_sv` raw voltage curve). Currently MySQL 5.7 mirrored at `10.0.0.9 / qheatavchisdb`; designed to be swappable (see below). Reached via RuoYi's multi-datasource (`@DataSource(SLAVE)`) as a read-only slave, isolated from the main DB.
-- **Auth** — RuoYi's Spring Security + JWT, reused as-is.
-- **Backend** = RuoYi's 6 native modules (`ruoyi-admin/framework/system/quartz/generator/common`) **+ one new `ruoyi-vqms` business module** containing `source/` (external read layer), `statistics/` (qualification-rate algorithm), `ingestion/` (Quartz precompute jobs). VQMS controllers live under `com.ruoyi.web.controller.vqms`.
-- Statistics module is called **in-process** (direct method call) by both query controllers and Quartz jobs. No Feign, no gateway.
-- **Planned ports** (host:container): mysql `13306:3306`, redis `16379:6379`, backend `7000:7000`, nginx `8080:80`. API prefix is env-specific (`/dev-api` in dev via vite proxy, `/prod-api` in prod via Nginx; both stripped before proxying to `backend:7000`) — see `项目规划_v3_1.md` §7.
+> ⚠️ `docs/` 下另有 `tmp.md`（scratch 笔记，**含明文 DB 凭证**，见 Security）、`数据源头（草稿）.md`、`外部源表优化建议.md` 等——非权威，仅供参考。
 
-## RuoYi reuse vs VQMS build (don't reinvent the scaffold)
+## Architecture (v3.4 — RuoYi-Vue base, MySQL decided)
 
-RuoYi solves the *generic admin system*; it does **not** solve voltage quality. Keep the boundary crisp:
-- **Reuse as-is**: login/JWT, user/role/menu/dept/dict/config management, oper/login logs, Quartz scheduler (with UI), Excel via POI (`@Excel`), code-gen, Druid monitor, Swagger, multi-datasource routing, frontend shell (login/layout/menu/user-center). RuoYi's `sys_*` tables and `sql/ry_*.sql` init scripts are used directly — do not re-create management tables.
-- **Build ourselves** (the actual VQMS value): `source/` (external read + dialect-swap), `statistics/` (per-minute verdict + daily/monthly/yearly weighted rollup), `ingestion/` (Quartz precompute jobs), and frontend `src/views/vqms/` dashboards (curve/daily/monthly/yearly + ECharts + export buttons).
-- **Upgrade-friendliness**: keep all changes inside `ruoyi-vqms`; do not modify RuoYi's native 6 modules. Minimizes merge pain when tracking upstream RuoYi releases.
+底座自 v3.1 起不变。Built on **若依/RuoYi-Vue**（前后端分离版，Spring Security + JWT + Redis）——不是 v2 自研单体，也不是 `y_project/RuoYi`（Shiro + Thymeleaf 单体）。**4 个 Docker Compose 容器**：`mysql` / `redis` / `backend` / `nginx`。
 
-## Storage-split rule (easy to violate — read this)
+- **MySQL 8.4** — 唯一持久化主库。存 RuoYi `sys_*` 管理表 **和** VQMS `voltage_quality_*` 派生统计；**绝不存原始业务数据**。（v2 选 PostgreSQL；v3.1 改为 MySQL——RuoYi 是 MySQL 原生，零方言/脚本迁移。）
+- **Redis** — RuoYi 必需（登录 token、验证码、限流、字典/配置缓存）。
+- **External source** — 只读业务数据（`his_curve_sv` 原始电压曲线）。当前为 `10.0.0.9 / qheatavchisdb` 的 MySQL 5.7 镜像，按可替换设计（见下）。经 RuoYi 多数据源（`@DataSource(SLAVE)`）作只读从库接入，与主库隔离。
+- **Auth** — RuoYi 的 Spring Security + JWT，原样复用。
+- **Backend** = RuoYi 6 个原生模块（`ruoyi-admin/framework/system/quartz/generator/common`）**+ 新增 `ruoyi-vqms` 业务模块**：`source/`（外部只读层）、`statistics/`（合格率算法）、`ingestion/`（Quartz 预计算作业）。VQMS 控制器位于 `com.ruoyi.web.controller.vqms`。
+- 统计模块被查询控制器和 Quartz 作业**进程内直调**（无 Feign、无网关）。
+- **端口**（host:container）：mysql `13306:3306`、redis `16379:6379`、backend `7000:7000`、nginx `8080:80`。API 前缀随环境（dev 经 vite proxy `/dev-api`、prod 经 Nginx `/prod-api`；两者均在转发到 `backend:7000` 前剥离）——见 v3.4 §7 / v3.1 §7。
 
-Raw voltage curves are **never copied into the MySQL main DB**. The external source is the single source of truth for raw data; MySQL stores only recomputable derived statistics + management data. The `source/` layer (inside `ruoyi-vqms`) is the sole read path to the external DB and is read-only by design (prevents accidental writes). When in doubt about where data lives: raw = external source; management + stats = MySQL.
+## RuoYi reuse vs VQMS build（别重造脚手架）
+
+RuoYi 解决*通用后台管理系统*，**不解决电压质量**。边界要清晰：
+- **原样复用**：登录/JWT、用户/角色/菜单/部门/字典/配置、操作/登录日志、Quartz（含 UI）、POI 导出（`@Excel`）、代码生成、Druid 监控、Swagger、多数据源路由、前端外壳（登录/布局/菜单/个人中心）。RuoYi `sys_*` 表与 `sql/ry_*.sql` 初始化脚本直接用——**不重建管理表**。
+- **自建**（VQMS 核心价值）：`source/`（外部读取 + 方言切换）、`statistics/`（逐分钟判定 + 日/月/年加权汇总）、`ingestion/`（Quartz 预计算）、前端 `src/views/vqms/` 仪表盘（曲线/日/月/年 + ECharts + 导出）。
+- **升级友好**：所有改动限制在 `ruoyi-vqms` 内，**不修改 RuoYi 原生 6 模块**，跟踪上游 RuoYi 发布时合并成本最小。
+
+## Storage-split rule（极易违反——必读）
+
+原始电压曲线**绝不复制进 MySQL 主库**。外部源是原始数据的唯一真相源；MySQL 只存可重算的派生统计 + 管理数据。`source/` 层（在 `ruoyi-vqms` 内）是通往外部库的**唯一读路径**，且设计为只读（防误写）。拿不准数据在哪时：**raw = 外部源；管理 + 统计 = MySQL**。
 
 ## External-source DB portability
 
-This is about the **external source** — independent of the (decided) MySQL main DB. The external source type is expected to change (currently MySQL 5.7). The `source/` layer must stay dialect-agnostic:
-- Access goes through a `HisCurveSvReader` **interface** returning JDBC-independent domain objects; one impl per dialect (`Mysql57CurveReader` today).
-- `save_time` is `varchar` and date-parse syntax differs by DB (`STR_TO_DATE` / `strftime` / `to_timestamp`) — keep parsing inside the impl, or `SELECT` the raw string and parse in Java.
-- Selection via config: `source.type=mysql57|mysql8|sqlite|postgres` + `source.driver` / `source.url` in `.env`/`sys_config`. Switching = change config + swap impl Bean; statistics and web code unchanged.
-- Only generic SQL (`SELECT ... WHERE save_time BETWEEN ? AND ? AND busbar_num = ?`); no DB-specific constructs.
+此处只针对**外部源**（与已定案的 MySQL 主库无关）。外部源类型预计会变（当前 MySQL 5.7），`source/` 层须保持方言无关：
+- 经 `HisCurveSvReader` **接口**访问，返回 JDBC 无关的领域对象；每种方言一个实现（当前 `Mysql57CurveReader`）。
+- `save_time` 是 `varchar`，日期解析语法因库而异（`STR_TO_DATE` / `strftime` / `to_timestamp`）——把解析留在实现内，或 `SELECT` 原始字符串在 Java 里解析。
+- 配置选择：`source.type=mysql57|mysql8|sqlite|postgres` + `source.driver` / `source.url`（`.env`/`sys_config`）。切换 = 改配置 + 换实现 Bean；统计与前端代码不变。
+- 只用通用 SQL（`SELECT ... WHERE save_time BETWEEN ? AND ? AND busbar_num = ?`），不用方言专属语法。
 
 ## 单位规约（Unit conventions）
 
@@ -55,17 +64,17 @@ VQMS 全项目统一采用以下规范单位，字段、计算、文档、UI 展
 
 | 量 | 规范单位 | 存储 | 说明 |
 |---|---|---|---|
-| 电压（`average_SV` / `high_SV` / `low_SV` / `plan_SV` / `nominal_kv` / `tolerance_v`） | **kV** | decimal | 源数据即为整数 kV（220kV 母线 `average_SV`≈234）；`tolerance_v` 用 `decimal(10,3)` 存（1.000 / 1.500） |
-| 无功功率 | **kvar** | decimal | 引用 AVC 规定原文时照录"万千乏"（1 万千乏 = 10000 kvar） |
+| 电压（`average_SV` / `high_SV` / `low_SV` / `plan_SV` / `nominal_kv` / `tolerance_v`） | **kV** | decimal | 源数据即整数 kV（220kV 母线 `average_SV`≈234）；`tolerance_v` 用 `decimal(10,3)`（1.000 / 1.500） |
+| 无功功率 | **kvar** | decimal | 引用 AVC 原文时照录"万千乏"（1 万千乏 = 10000 kvar） |
 | 有功 / 容量 | **kW** | decimal | 引用原文时照录"万千瓦" |
 | 合格率 / 投运率 | **%** | decimal | 聚合按分钟数加权，**绝不直接平均率列** |
 | 时间（聚合） | **分钟数** | int | 各统计粒度记合格 / 不合格 / 剔除分钟计数 |
 
-**关键一致性**：阈值公式 `|average_SV − plan_SV| ≤ tolerance_v` 三者必须同单位（kV）。源 SV 字段读入后**不做单位换算**（原值即 kV）。`yc_history` 模拟量按 `yc_point_map.unit` 标注，纳入统计前归一到规范单位。
+**单位一致性**：源 SV 字段读入后**不做单位换算**（原值即 kV）。无论最终采用哪种判定模型（见下），参与比较的电压量必须同单位（kV）。`yc_history` 模拟量按 `yc_point_map.unit` 标注，纳入统计前归一到规范单位。
 
 ## AVC 考核规定 —— VQMS 实现依据
 
-VQMS 的考核功能以《东北区域电力并网运行管理实施细则》《东北区域电力辅助服务管理实施细则》**附件6「AVC 装置技术指标要求及考核规定」**（东北能源监管局 2024-09-04 印发，p47–48）为政策依据。原文存档于 `docs/政策口径/AVC 装置技术指标要求及考核规定.md`。三个考核维度均为 VQMS 实现目标：
+VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东北区域电力辅助服务管理实施细则》**附件6「AVC 装置技术指标要求及考核规定」**（东北能源监管局 2024-09-04 印发，p47–48）为政策依据。原文存档于 `docs/政策口径/AVC 装置技术指标要求及考核规定.md`。三个考核维度均为 VQMS 实现目标：
 
 1. **AVC 装置投运率** = 投运时间 / 并网运行时间 × 100%，合格 **≥99%**（扣除电网原因退出时间）。
 2. **AVC 装置调节合格率** = 执行合格点数 / 发令次数 × 100%，合格 **≥100%**；调度电压/无功指令下达后，AVC 装置须在 **1 分钟内**调整到合格区间。
@@ -73,11 +82,9 @@ VQMS 的考核功能以《东北区域电力并网运行管理实施细则》《
 
 **考核单价**（投运率、调节合格率缺额通用）：每缺 1 个百分点 = 额定容量 × **0.02 分/万千瓦**，线性（非分档）。
 
-**调节合格率分档（VQMS 细化，两档平行考察）**：附件6 §二 的"1 分钟内"为合格线；不合格部分（>1 分钟）按响应时长分两档——**调节快速性考核** [1,5) 分钟（响应快慢 / 动态性能）、**调节经济性考核** ≥5 分钟（持续越限的经济代价）。**分档阈值（1、5 分钟）均为现场可整定**（上为默认值，运行人员可在阈值管理表调整）。命名统一用"性"（非"型"）；附件6 本身无 5 分钟分档，此为 VQMS 细化、5 分钟阈值外部依据待确认。详见 `docs/政策口径/调节合格率分档考核.md`。
+**调节合格率两档分档**：附件6 §二 的"1 分钟内"为合格线；不合格部分（>1 分钟）按响应时长分两档——**调节快速性考核** [1,5) 分钟、**调节经济性考核** ≥5 分钟。分档阈值（1、5 分钟）均**现场可整定**。命名统一用"性"（非"型"）。详见 `docs/政策口径/调节合格率分档考核.md` 与 `docs/AVC考核核心算法_草稿.md` §2.4–2.7。
 
-> **两档关系（2026-08-13 定）**：快速性档与经济性档是**两个并列的独立考核项，平行考察、互不隶属、不 fall-through**（贴合附件6 把「调节快速性考核」「调节经济性考核」列为两个独立考核项）。两档**并行**各判一次（综合区间是否夹住目标电压）、**各档不合格逐档判免考**（免考结论不跨档）、**各出各的合格率、各算各的罚款，相加得总罚款**。一条指令有两个独立结论（如「快速性不合格 + 经济性合格」合法）。旧的串联 fall-through 模型（短窗没夹住才进长窗、合成单一合格率）**已废弃**。权威定义见 `docs/AVC考核核心算法_草稿.md` §2.4–2.7。
-
-**合格区间（电压调整允许偏差）= VQMS `tolerance_v` 容差权威值：**
+**合格区间（电压调整允许偏差）= `tolerance_v` 容差权威值：**
 
 | 电压等级 | 允许偏差 |
 |---|---|
@@ -85,25 +92,73 @@ VQMS 的考核功能以《东北区域电力并网运行管理实施细则》《
 | 220 kV | ±1 kV (±1000 V) |
 | 66 kV 及以下 | ±1% 额定电压 |
 
-> ✅ v3.4 §5.2 `busbar_threshold.tolerance_v` 已据此更正并统一为 kV：原误值 220kV=300 / 500kV=500（int 伏特）已改为 `decimal(10,3)` kV，值 **1.000 / 1.500**。
+> ✅ `busbar_threshold.tolerance_v` 已据此统一为 kV：原误值 220kV=300 / 500kV=500（int 伏特）已改为 `decimal(10,3)` kV，值 **1.000 / 1.500**。
 
-## Voltage-quality algorithm & source-data quirks
+## Voltage-quality 判定模型 —— 草稿为准（2026-08-13 Leo 拍板）
 
-These constraints come from the source schema and are non-obvious — they affect every query and calculation:
+**判定口径以 `docs/AVC考核核心算法_草稿.md` 为准。** 该草稿定义了**指令级包络判定**，与 v3.4 §1.1 的旧逐分钟均值模型（`|average_SV − plan_SV| ≤ tolerance_v`）不同——草稿已 supersede 旧模型；动手前若发现 v3.4 / `外部数据源.md` / 核心算法流程图仍写旧模型，以草稿为准。
 
-> ⚠️ **Verdict model (updated 2026-08-12, supersedes earlier design)**: qualification checks the row's `high_SV`/`low_SV` against a **static** per-busbar interval `[low_limit, high_limit]` from the VQMS threshold table. The earlier `|average_SV − plan_SV| ≤ tolerance_v` design (average_SV vs dynamic AVC band) is **abandoned**; `average_SV`/`plan_SV` no longer participate in qualification. **Open follow-ups**: threshold-table schema (absolute kV bounds vs center±tolerance), `tolerance_v`'s remaining role, and syncing `项目规划_v3_4.md` / `docs/外部数据源.md` / 核心算法流程图 (which still hold the old average_SV model).
+### 指令级包络判定（草稿 §2.1–2.4，权威）
 
-- **`save_time` is `varchar(255)`, not `datetime``**, carries milliseconds, and has no timezone. Interpret as `Asia/Shanghai`; validate format on read and **skip+log** malformed rows rather than failing the batch.
-- **No primary key, no index** on `his_curve_sv`. Reads must dedup + sort by `(save_time, busbar_num)`.
-- **Dual-write**: each minute writes one row for busbar `0` and one for busbar `1`. Group all statistics by `busbar_num`.
-- **Time principle: round to nearest minute (就近取整，秒 ≥ 30 进位)**. Raw timestamps in `his_curve_sv` and `yc_history` (millisecond-precision `save_time`) are **就近取整到分钟** before any per-minute aggregation — seconds ≥ 30 round up, < 30 round down. This shared rule is the alignment basis for every per-minute verdict and rollup; do **not** floor/truncate or group by raw seconds.
-- **Per-minute field semantics (updated 2026-08-12)**: each `his_curve_sv` row is one minute-level acquisition window. `high_SV`/`low_SV` = window observed max/min — **the values VQMS now uses for qualification**. `average_SV` = window mean — **no longer used for qualification** (was the old design). `plan_SV` = AVC dispatch setpoint — **no longer used for qualification** (was the band center); sample value `10245` remains a discard-value (skip+log, do not decode).
-- **Per-minute verdict (new model, 2026-08-12)**: checks the row's `high_SV`/`low_SV` against a **static per-busbar qualification interval** `[low_limit, high_limit]` (kV) from the VQMS threshold table: `low_limit ≤ low_SV AND high_SV ≤ high_limit` = qualified; `high_SV > high_limit` = over-high; `low_SV < low_limit` = over-low. Boundary equality counts as qualified. This is **stricter** than the old mean-band test (entire-minute swing must stay in band). `tolerance_v`'s role under this model is TBD (open). **Threshold source**: a **VQMS-managed table** (RuoYi admin, operators can edit) — `BUSBAR_VRateParameter` is explicitly excluded and does not participate in any calculation (see `docs/外部数据源.md` §3.2). Table design, first-batch values, and recalc-on-change policy still TBD; see `docs/外部数据源.md` §5.
-- **`plan_SV` = AVC dispatch setpoint** (the per-minute target voltage) — **no longer used for qualification** under the new (2026-08-12) verdict model; retained as contextual/display data. The sample value `10245` is a **discard-value** (test-data garbage) — skip+log, **do not decode** (no `ori_code` investigation, no formula reverse-engineering). Details: `docs/外部数据源.md` §4.
-- **Rollup weighting (critical)**: monthly stats roll up from daily, yearly from monthly, via MySQL `INSERT...SELECT...GROUP BY...ON DUPLICATE KEY UPDATE` summing **minute counts** (full DDL + rollup SQL in `项目规划_v3_1.md` §5.2 / §6.3). **Never average the rate columns directly** — recompute `qualification_rate = SUM(qualified_minutes)/SUM(total_minutes)*100` etc. `avg_SV` is weighted by `total_minutes`. (`VALUES(col)` in the UPSERT is deprecated since MySQL 8.0.20 but still works; see v3.1 §6.3 note for the alias-syntax alternative.)
-- Sample data is degenerate steady-state (`high=low=avg`, no window swing); over-limit branches need real varying data to validate. Qualification depends on the TBD static threshold (not the row's high/low), so "all-qualified" does not follow from steady-state alone.
+- **判定对象**：一条 AVC 指令（`warn_info` 表 `warn_type=5` 记录，含目标值/增量值），**不是逐分钟**。
+- **目标电压 `V_target`（kV）**——从指令解码，**不从 `his_curve_sv.plan_SV` 取**（plan_SV 不参与判定）：
+  - 目标值形态：文本数值 `÷100` → kV（如 `22315` → 223.15 kV）；
+  - 增量值形态：解码 4 位编码 → 幅值 × 100V × 方向，**+ t₀ 时刻当前实时母线电压** → 绝对目标（如 `2202`=+200V；234.25 + 0.2 → 234.45 kV）。
+- **区间聚合（包络并集）**：N 分钟窗口内每分钟一组 `(high_SV_k, low_SV_k)`，聚合为综合区间 `[L_N, H_N] = [min(low_SV_1..N), max(high_SV_1..N)]`——窗口内电压摆动**曾覆盖的最宽范围**。
+- **判定**：`V_target ∈ [L_N, H_N]` = 该窗合格。**逐分钟原始判定被取代**——不再是"每分钟单独判均值是否落在带内"。
+
+### 逐分钟字段在判定中的角色
+
+| 字段 | 角色 | 说明 |
+|---|---|---|
+| `high_SV` / `low_SV` | **判定用**（聚合进包络区间） | 窗口观测极值，取 max/min 构成 `[L,H]` |
+| `average_SV` | 不参与判定 | 旧模型用它，草稿已弃 |
+| `plan_SV` | 不参与判定 | 目标来自 `warn_info`；样例值 `10245` 是废值，跳过+记日志，不解码 |
+
+### 两档关系（平行独立，不 fall-through）
+
+快速性档与经济性档是**两个并列的独立考核项，平行考察、互不隶属、不 fall-through**。两档**并行**各判一次（各自综合区间是否夹住 `V_target`）、**各档不合格逐档判免考**（免考结论不跨档）、**各出各的合格率、各算各的罚款，相加得总罚款**。一条指令可有两个独立结论（如「快速性不合格 + 经济性合格」合法）。旧的串联 fall-through 模型（短窗没夹住才进长窗、合成单一合格率）**已废弃**。
+
+| 档 | 扫描窗口 | 综合区间 | 罚的是 |
+|---|---|---|---|
+| 快速性档 | 第 1 ~ `T_fast` 分钟 | `[L_fast, H_fast]` | 调得慢（动态性能） |
+| 经济性档 | 第 `T_fast+1` ~ `T_econ` 分钟 | `[L_econ, H_econ]` | 持续越限（经济代价） |
+
+整定参数：`T_fast` 默认 5 min、`T_econ` 待定（"≥5"取上限，如 30 min），现场可整定。权威定义见草稿 §2.4–2.7。
+
+## Source-data 硬约束（来自外部源 schema，每次查询/计算都适用）
+
+这些约束来自外部源表结构，非显而易见，影响每一条查询与计算：
+
+- **`save_time` 是 `varchar(255)` 而非 `datetime`**，带毫秒，无时区。按 `Asia/Shanghai` 解释；读取时校验格式，**坏行跳过 + 记日志**，不让整批失败。
+- **`his_curve_sv` 无主键、无索引**。读取须自行去重 + 按 `(save_time, busbar_num)` 排序。
+- **双写**：每分钟写一条 busbar `0` + 一条 busbar `1`。所有统计按 `busbar_num` 分组。
+- **时间原则：就近取整到分钟（秒 ≥ 30 进位）**。`his_curve_sv` 和 `yc_history`（毫秒精度 `save_time`）的原始时间戳在任何逐分钟聚合前**就近取整到分钟**——秒 ≥ 30 进位，< 30 舍去。这是所有逐分钟判定与汇总的对齐基础；**不要 floor/截断，也不要按原始秒分组**。
+- **逐分钟字段语义**：每行 `his_curve_sv` 是一个分钟级采集窗口。`high_SV`/`low_SV` = 窗口观测最大/最小值——**判定用**（聚合进包络区间 `[min(low), max(high)]`，见上「判定模型」）；`average_SV` = 窗口均值——旧模型用，草稿已弃；`plan_SV` = AVC 调度设定值——**不参与判定**（目标来自 `warn_info`），样例值 `10245` 是**废值**，跳过+记日志，**不解码**（不查 `ori_code`、不反推公式）。
+- **Rollup 加权（关键）**：月统计由日表汇总、年由月表，经 MySQL `INSERT...SELECT...GROUP BY...ON DUPLICATE KEY UPDATE` 对**分钟计数**求和（完整 DDL + rollup SQL 见 v3.4 §5.2 / v3.1 §6.3）。**绝不直接平均率列**——重算 `qualification_rate = SUM(qualified_minutes)/SUM(total_minutes)*100` 等；`avg_SV` 按 `total_minutes` 加权。（UPSERT 中 `VALUES(col)` 自 MySQL 8.0.20 起废弃但仍可用；别名写法见 v3.1 §6.3。）
+
+### Source-data 验证注意（非硬约束，影响测试设计）
+
+- 样例数据是退化的稳态（`high=low=avg`，无窗口摆幅）；越限分支需真实波动数据才能验证。稳态数据"全合格"不必然成立——合格取决于阈值/判定模型，而非单纯稳态。
+- `BUSBAR_VRateParameter` 表**明确排除**，不参与任何计算（见 `docs/外部数据源.md` §3.2）。判定用阈值来自 VQMS 自管表（RuoYi 后台可编辑），其 schema、首批值、变更回算策略**待定**（见下 Open follow-ups）。
+
+## ⚠️ Open follow-ups（待办，非既定事实）
+
+以下为未决事项，**不要当现有约束引用**，动手前找 Leo 确认：
+
+- **🔴 考核指标落库结构未对齐（首要，后端建表前必须定）**：草稿（附件6 ①②③）与 v3.4 `voltage_quality_*` 表是**两套不同口径**，不能共用表——
+  - 草稿 §2 **调节合格率** = 指令级，分母=**发令次数**，两档（快速性/经济性）平行各自合格率；目标电压来自 `warn_info` 解码。
+  - 草稿 §1 **投运率** = 时间记账（投运/退出/电网原因退出分钟）。
+  - v3.4 `voltage_quality_daily/monthly/yearly` = 逐分钟"电压控制达标率"，分母=**分钟数**（`total_minutes`），只有偏高/偏低方向、无两档维度，目标来自 `his_curve_sv.plan_SV`。
+  - **结论**：附件6 ①②③ 各需独立落库表（调节合格率按指令记账、投运率按时间记账），`voltage_quality_*` 仅作逐分钟达标率、≠附件6 调节合格率。后端建 `ruoyi-vqms` 前需先定这三张表的 DDL 边界。
+- **`T_econ` 上限**：草稿标"待定"——"≥5min"若无上界，长越限会永远在经济性窗内算合格；**需定上限**（如 30 min）。
+- **阈值管理表 schema**：首批阈值数值、变更是否回溯重算（v3.4 §5.3 倾向**不回算**，带 `effective_from/to`，仅影响生效期之后）。注：判定已改为指令级包络，v3.4 `busbar_threshold`（`tolerance_v` + `plan_SV` 口径）的角色需重新定位——指令级判定用的是 `warn_info` 目标 + 包络区间，不再读 `plan_SV`/`tolerance_v`。
+- **草稿本身待定稿**（草稿 §2.8）：目标值/增量解码的位定义（增量第 2 位"循环码"含义）、缺数据策略、多条指令时间重叠处理——待真实数据验证。
+- **文档同步债**：v3.4 / `docs/外部数据源.md` / 核心算法流程图 仍写旧 `average_SV` + `plan_SV` 模型，与草稿冲突——以草稿为准，但改动前先核对各文档当前说法。
+- **500kV 母线数据缺失**：`busbar` / `busbar_threshold` / `yc_point_map` 均待现场补录。
+- **后端落地**：`ruoyi-vqms` 模块、build/test 命令、真实数据验证均未开始。
 
 ## Security
 
-- `tmp.md` committed **plaintext DB credentials** (MySQL root password, host). Before this repo is ever made public: scrub the password from git history and rotate it. Do not add new secrets to tracked files.
-- `.env` (planned) must never be committed — it holds external-source connection strings, MySQL root password (init only), app DB account credentials, Redis address, JWT secret. **App runtime connects via a least-privilege account (e.g. `vqms_app`), not root** — root is for first-time init only (create DB/tables, `CREATE USER` + `GRANT`); see `项目规划_v3_1.md` §9 for the account-split setup.
+- `docs/tmp.md`（scratch 笔记）**含明文 DB 凭证**（MySQL root 密码、主机）。仓库公开前：从 git 历史擦除密码并轮换。**不要再往受跟踪文件写新秘密。**
+- `.env`（规划中）绝不提交——含外部源连接串、MySQL root 密码（仅初始化用）、应用 DB 账号凭证、Redis 地址、JWT secret。**应用运行时用最小权限账号（如 `vqms_app`）连接，不用 root**——root 仅首次初始化（建库/建表、`CREATE USER` + `GRANT`）；账号拆分见 v3.1 §9。

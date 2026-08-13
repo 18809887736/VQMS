@@ -31,7 +31,8 @@ class CurvePoint:
 @dataclass
 class Command:
     """warn_info 一条指令（warn_type=5）。"""
-    t0: datetime                     # 指令下达时刻（就近取整到分钟后的 t₀）
+    t0: datetime                     # 就近取整到分钟后的 t₀（曲线锚点 + 判定基准）
+    raw_warn_time: datetime          # 原始 warn_time（带亚秒，写 warn_info 列）
     obj_num: int                     # 对象编号（分通道用）
     warn_info_text: str              # 完整文本（目标值 / 增量形态）
     realtime_v_kv: float | None = None  # 增量形态拼接用的 t₀ 实时电压；目标值形态不用

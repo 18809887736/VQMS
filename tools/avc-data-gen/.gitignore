@@ -1,0 +1,5 @@
+# 生成产物（.sql / manifest）不入库，由 `python -m src.cli` 现场生成
+output/
+__pycache__/
+*.pyc
+.env

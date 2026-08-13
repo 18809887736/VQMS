@@ -11,9 +11,9 @@
 
 -- ---------- 一级目录（M，parent_id=0）----------
 -- 2000 合格率统计
-insert into sys_menu values('2000', '合格率统计', '0', '5', 'stats', null, '', '', 1, 0, 'M', '0', '0', '', 'chart', 'admin', sysdate(), '', null, 'VQMS 合格率统计目录');
+insert into sys_menu values('2000', '合格率统计', '0', '5', 'stats', null, '', '', 1, 0, 'M', '0', '0', '', 'dashboard', 'admin', sysdate(), '', null, 'VQMS 合格率统计目录');
 -- 2010 曲线查询
-insert into sys_menu values('2010', '曲线查询', '0', '6', 'curve', null, '', '', 1, 0, 'M', '0', '0', '', 'line-chart', 'admin', sysdate(), '', null, 'VQMS 曲线查询目录');
+insert into sys_menu values('2010', '曲线查询', '0', '6', 'curve', null, '', '', 1, 0, 'M', '0', '0', '', 'chart', 'admin', sysdate(), '', null, 'VQMS 曲线查询目录');
 -- 2020 AVC 考核
 insert into sys_menu values('2020', 'AVC 考核', '0', '7', 'avc', null, '', '', 1, 0, 'M', '0', '0', '', 'monitor', 'admin', sysdate(), '', null, 'VQMS AVC 考核目录');
 -- 2030 系统配置

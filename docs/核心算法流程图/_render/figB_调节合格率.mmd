@@ -1,0 +1,62 @@
+graph TD
+    classDef s1 fill:#f3e8ff,stroke:#6b21a8,stroke-width:2px,color:#000
+    classDef s2 fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#000
+    classDef gate fill:#fef9c3,stroke:#a16207,stroke-width:2px,color:#000
+    classDef pass fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#000
+    classDef fail fill:#fecaca,stroke:#b91c1c,stroke-width:2px,color:#000
+    classDef skip fill:#f1f5f9,stroke:#64748b,stroke-width:1px,color:#000
+    classDef out fill:#fce7f3,stroke:#be185d,stroke-width:2px,color:#000
+
+    Start(["一道 AVC 调压指令"]) --> A1
+
+    subgraph 解码 ["① 算出这道指令的目标电压"]
+        A1["把指令翻译成<br/>「要把电压调到多少 kV」"]:::s1
+        A1 --> A2{"能算出来吗？"}:::gate
+        A2 -->|"翻译失败 / 数据缺失"| S1["这道指令跳过<br/>不计数"]:::skip
+        A2 -->|"算得出"| A3["目标电压 V"]:::s2
+    end
+
+    A3 --> B1
+
+    subgraph 对齐 ["② 取这一段电压曲线（按分钟）"]
+        B1["以下令时刻为起点<br/>取后面每分钟的最高/最低电压"]:::s2
+    end
+
+    B1 --> C1
+
+    subgraph 快速窗 ["③ 看短窗口（快速性档，约前 5 分钟）"]
+        C1["把短窗口里每分钟<br/>最高/最低电压并起来<br/>得到一个总范围"]:::s2
+        C1 --> C2{"目标电压落进<br/>这个短窗口范围了吗？"}:::gate
+        C2 -->|"落进去了"| Q1["✅ 调得快<br/>短窗口就够到目标"]:::pass
+        C2 -->|"没落进去"| C3["再往下看"]:::skip
+    end
+
+    C3 --> D1
+
+    subgraph 经济窗 ["④ 看长窗口（经济性档，约 5~30 分钟）"]
+        D1["把长窗口里每分钟<br/>最高/最低电压并起来<br/>得到一个总范围"]:::s2
+        D1 --> D2{"目标电压落进<br/>这个长窗口范围了吗？"}:::gate
+        D2 -->|"落进去了"| Q2["✅ 调得慢<br/>长窗口才够到目标（仍合格）"]:::pass
+        D2 -->|"还是没落进去"| E0["两个窗口都没够到 → 不合格"]:::fail
+    end
+
+    E0 --> F1
+
+    subgraph 免考 ["⑤ 免考吗？（剔除）"]
+        F1{"是不是所有无功设备<br/>都顶满了还是调不动？"}:::gate
+        F1 -->|"是（设备已尽力）"| Q3["免考<br/>不算进分母、不罚"]:::skip
+        F1 -->|"否 / 拿不到设备数据"| Q4["❌ 不合格，罚"]:::fail
+    end
+
+    Q1 --> R1
+    Q2 --> R1
+    Q3 --> R1
+    Q4 --> R1
+
+    subgraph 统计 ["⑥ 算调节合格率"]
+        R1["有效指令数 = 总指令 − 免考指令"]:::out
+        R1 --> R2["调节合格率 =<br/>（调得快 + 调得慢合格数）÷ 有效指令数"]:::out
+        R2 --> R3["罚款 ∝ 不合格-非免考的指令数"]:::fail
+    end
+
+    R3 --> End(["结束：调节合格率出结果"])

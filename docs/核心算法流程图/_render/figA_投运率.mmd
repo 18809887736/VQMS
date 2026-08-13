@@ -1,0 +1,42 @@
+graph TD
+    classDef s1 fill:#f3e8ff,stroke:#6b21a8,stroke-width:2px,color:#000
+    classDef s2 fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#000
+    classDef gate fill:#fef9c3,stroke:#a16207,stroke-width:2px,color:#000
+    classDef pass fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#000
+    classDef fail fill:#fecaca,stroke:#b91c1c,stroke-width:2px,color:#000
+    classDef skip fill:#f1f5f9,stroke:#64748b,stroke-width:1px,color:#000
+    classDef out fill:#fce7f3,stroke:#be185d,stroke-width:2px,color:#000
+
+    Start(["统计周期：一个月"]) --> A1
+
+    subgraph 取数 ["① 取数与对齐"]
+        A1["读取 AVC 投退信号<br/>1 = 投入 / 0 = 退出"]:::s1
+        A1 --> A2["时间归到每一分钟<br/>秒数 ≥30 进位"]:::s2
+        A2 --> A3["读取并网运行信号"]:::s1
+    end
+
+    A3 --> G1
+
+    subgraph 逐分钟 ["② 逐分钟判定（这个月里每一分钟都过一遍）"]
+        G1{"这一分钟<br/>机组并网了吗？"}:::gate
+        G1 -->|"没并网"| S1["这一分钟不考核<br/>（直接跳过）"]:::skip
+        G1 -->|"并网了"| G2{"这一分钟<br/>AVC 装置投着吗？"}:::gate
+        G2 -->|"投着"| P1["投运分钟 +1<br/>（在线干活）"]:::pass
+        G2 -->|"退了"| G3{"退出是<br/>谁的原因？"}:::gate
+        G3 -->|"电网原因<br/>（甩锅给电网）"| S2["电网原因退出<br/>不罚（扣除）"]:::skip
+        G3 -->|"非电网原因<br/>（自身问题）"| F1["非电网退出<br/>计罚"]:::fail
+    end
+
+    P1 --> D1
+    S2 --> D1
+    F1 --> D1
+
+    subgraph 汇总 ["③ 算投运率"]
+        D1["投运率 =<br/>投运分钟 ÷（投运分钟 + 非电网退出分钟）<br/>电网原因退出从分母里扣掉"]:::out
+        D1 --> D2{"够 99% 吗？"}:::gate
+        D2 -->|"够"| E1["合格"]:::pass
+        D2 -->|"不够"| D3["缺几个百分点 → 罚<br/>每缺 1 点 = 额定容量 × 0.02 分/万千瓦"]:::fail
+    end
+
+    E1 --> End(["结束：投运率出结果"])
+    D3 --> End

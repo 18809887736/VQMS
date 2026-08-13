@@ -10,34 +10,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 权威文档与版本演进链
 
-规划文档按版本迭代，**只看最新一版**。演进链：v1（微服务）→ v2（自研单体/PG）→ v3（RuoYi 底座，主库未定）→ v3.1（RuoYi + MySQL 定案）→ v3.2（辨析国标区间 vs AVC 控制目标）→ v3.3（统计单元/桶，**已撤销**）→ **v3.4（现行权威）**。底座、DDL、外部源规格自 v3.1 起一致，v3.4 相对 v3.2 无判定层变更（仅撤销 v3.3 的桶设计）。
+规划文档按版本迭代，**只看最新一版**。演进链：v1（微服务）→ v2（自研单体/PG）→ v3（RuoYi 底座，主库未定）→ v3.1（RuoYi + MySQL 定案）→ v3.2（辨析国标区间 vs AVC 控制目标）→ v3.3（统计单元/桶，**已撤销**）→ v3.4（撤销桶）→ **v4.0（现行权威：自洽整合 + 算法搁置 + 前端并入）**。v4.0 把 v3.1 底座、v3.4 管理表、草稿口径、前端三阶段整合成一份自洽落地依据。
 
 | 文档 | 位置 | 状态 |
 |---|---|---|
-| **项目规划_v3_4.md** | `docs/项目规划_v3_4.md` | ✅ **权威**，以此为准 |
-| 项目规划 v3.1 / v3.2 / v3.3 | `backup/` | Superseded（v3.1 定 MySQL；v3.2 增区间辨析；v3.3 桶设计已撤销） |
+| **项目规划_v4_0.md** | `docs/项目规划_v4_0.md` | ✅ **权威**，以此为准（自洽整合版，含算法搁置策略） |
+| 项目规划 v3.4 / v3.1 / v3.2 / v3.3 | `docs/` 或 `backup/` | Superseded（v4.0 已整合其内容） |
 | 项目规划 v1 / v2 | `backup/` | Superseded（微服务 / 自研单体+PG） |
-| AVC考核核心算法_草稿.md | `docs/AVC考核核心算法_草稿.md` | ✅ **算法权威**（2026-08-13 Leo 拍板以此为准），含投运率(§一)+调节合格率(§二)+两档平行模型(§2.4–2.7)。草稿自述仍待真实数据定稿，但**判定口径以此为准**，v3.4 的 `average_SV` 旧模型已被 supersede |
+| AVC考核核心算法_草稿.md | `docs/AVC考核核心算法_草稿.md` | ✅ **算法口径权威**（2026-08-13 Leo 拍板以此为准），含投运率(§一)+调节合格率(§二)+两档平行模型(§2.4–2.7)。草稿自述仍待真实数据定稿，但**判定口径以此为准**。v4.0 §8 把判定实现搁置为接口+stub |
 | 外部数据源.md | `docs/外部数据源.md` | 外部库字段语义权威 |
 | 核心算法流程图（含通俗版） | `docs/核心算法流程图/` | 辅助理解，以规划文档为准 |
 | 政策口径（附件6、分档考核、免考） | `docs/政策口径/` | AVC 考核政策原文 |
-| 前端规划与实施路径.md | `docs/前端/` | 前端落地节奏 |
 | 部署 / 迁移 / 品牌去除计划 | `docs/` | 运维与改造 |
 | 外部 DB 表 schema + 样例 | `docs/外部DB/` | 含 `his_curve_sv.md` 等 |
 
 > ⚠️ `docs/` 下另有 `tmp.md`（scratch 笔记，**含明文 DB 凭证**，见 Security）、`数据源头（草稿）.md`、`外部源表优化建议.md` 等——非权威，仅供参考。
 
-## Architecture (v3.4 — RuoYi-Vue base, MySQL decided)
+## Architecture (v4.0 — RuoYi-Vue base, MySQL decided)
 
 底座自 v3.1 起不变。Built on **若依/RuoYi-Vue**（前后端分离版，Spring Security + JWT + Redis）——不是 v2 自研单体，也不是 `y_project/RuoYi`（Shiro + Thymeleaf 单体）。**4 个 Docker Compose 容器**：`mysql` / `redis` / `backend` / `nginx`。
 
-- **MySQL 8.4** — 唯一持久化主库。存 RuoYi `sys_*` 管理表 **和** VQMS `voltage_quality_*` 派生统计；**绝不存原始业务数据**。（v2 选 PostgreSQL；v3.1 改为 MySQL——RuoYi 是 MySQL 原生，零方言/脚本迁移。）
+- **MySQL 8.4** — 唯一持久化主库。存 RuoYi `sys_*` 管理表 + VQMS 管理表（`busbar` 等）+ 派生统计；**绝不存原始业务数据**。（v2 选 PostgreSQL；v3.1 改为 MySQL——RuoYi 是 MySQL 原生，零方言/脚本迁移。）
 - **Redis** — RuoYi 必需（登录 token、验证码、限流、字典/配置缓存）。
-- **External source** — 只读业务数据（`his_curve_sv` 原始电压曲线）。当前为 `10.0.0.9 / qheatavchisdb` 的 MySQL 5.7 镜像，按可替换设计（见下）。经 RuoYi 多数据源（`@DataSource(SLAVE)`）作只读从库接入，与主库隔离。
+- **External source** — 只读业务数据（`his_curve_sv` 原始曲线、`yc_history` 遥测/门控、`warn_info` 指令）。当前 MySQL 5.7 @ `10.0.0.9`，按可替换设计。经 RuoYi 多数据源（`@DataSource(SLAVE)`）作只读从库接入。
 - **Auth** — RuoYi 的 Spring Security + JWT，原样复用。
-- **Backend** = RuoYi 6 个原生模块（`ruoyi-admin/framework/system/quartz/generator/common`）**+ 新增 `ruoyi-vqms` 业务模块**：`source/`（外部只读层）、`statistics/`（合格率算法）、`ingestion/`（Quartz 预计算作业）。VQMS 控制器位于 `com.ruoyi.web.controller.vqms`。
+- **Backend** = RuoYi 6 个原生模块 **+ 新增 `ruoyi-vqms` 业务模块**：`source/`（外部只读层）、`statistics/`（合格率算法，**判定搁置为接口+stub**）、`ingestion/`（Quartz 预计算作业，**搁置**）。VQMS 控制器位于 `com.ruoyi.web.controller.vqms`。
 - 统计模块被查询控制器和 Quartz 作业**进程内直调**（无 Feign、无网关）。
-- **端口**（host:container）：mysql `13306:3306`、redis `16379:6379`、backend `7000:7000`、nginx `8080:80`。API 前缀随环境（dev 经 vite proxy `/dev-api`、prod 经 Nginx `/prod-api`；两者均在转发到 `backend:7000` 前剥离）——见 v3.4 §7 / v3.1 §7。
+- **端口**（host:container）：mysql `13306:3306`、redis `16379:6379`、backend `7000:7000`、nginx `8080:80`。API 前缀随环境（dev `/dev-api`、prod `/prod-api`；均剥离后转发到 `backend:7000`）——见 v4.0 §10。
+
+## 工程决策：核心算法搁置预留（v4.0 核心）
+
+判定算法是最不稳定的一块（草稿 §2 待真实数据定稿）。v4.0 把工程拆**确定轨 / 搁置轨**：
+- **确定轨**（不依赖算法定稿，现在就做）：`source/` 外部只读层、管理表 DDL（`busbar`/`busbar_group`/`yc_point_map`/`busbar_threshold`）、时间对齐工具（就近取整到分钟）、格式校验三步闸门（反制 varchar `save_time`）、RuoYi 脚手架对接（菜单/权限 + 7 个前端页面）、前端三阶段。
+- **搁置轨**（等算法定稿）：判定逻辑 → `RegulationJudge` 接口 + `StubRegulationJudge` 占位；调节合格率/投运率落库 DDL；Quartz 预计算编排。
+- **关键**：判定抽象为接口（输入=指令+窗口逐分钟 high_SV/low_SV+参数，输出=两档三态结论），算法定型后**只换实现、不动调用方**。详见 v4.0 §8/§12。**没定 DDL 前别硬写统计表**——留空壳接口即可。
 
 ## RuoYi reuse vs VQMS build（别重造脚手架）
 
@@ -146,20 +152,17 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 
 以下为未决事项，**不要当现有约束引用**，动手前找 Leo 确认：
 
-- **✅ 调节合格率落库口径已定（2026-08-13 Leo 拍板：以草稿 §2 为准）**：
-  - **指令级**统计，分母=**发令次数**（不是分钟数）；两档（快速性/经济性）平行，各自合格率、各自免考剔除、各自罚款，总罚款=两档之和。
-  - 目标电压 `V_target` 来自 `warn_info` 解码（不从 `his_curve_sv.plan_SV` 取）；判定 = `V_target ∈ [窗口 high_SV/low_SV 包络并集]`。
-  - **v3.4 `voltage_quality_daily/monthly/yearly`（分钟级、分母=分钟数、`average_SV`/`plan_SV` 口径）不再作为调节合格率的落库结构**——口径不符，不能复用。该表是否保留为独立的"逐分钟电压达标率"统计、还是废弃，待定。
-  - 落库 DDL（指令明细表 + 日/月/年 rollup）**待设计**；草稿 §2.8 待定项（`T_econ` 上限、目标解码位定义、缺数据策略）需真实数据验证。
-- **投运率落库（草稿 §1）**：时间记账口径（投运/退出/电网原因退出分钟）以草稿 §1 为准，落库表待设计；当前焦点在调节合格率。
+- **✅ 判定口径 + 落库方向已定（2026-08-13 Leo 拍板：以草稿 §2 为准）**：指令级统计，分母=发令次数，两档平行；`V_target` 来自 `warn_info` 解码（不用 `plan_SV`）；判定 = `V_target ∈ [high_SV/low_SV 包络并集]`。v3.4 分钟级 `voltage_quality_*` 表不复用作调节合格率落库。
+- **✅ 工程策略：算法搁置预留（v4.0 §8/§12）**：判定实现为 `RegulationJudge` 接口 + `StubRegulationJudge` 占位；调节/投运率落库 DDL + Quartz 编排留空壳。确定轨（source 只读层/管理表/时间工具/闸门/脚手架/前端）照常推进，不被算法推翻。
 - **`T_econ` 上限**：草稿标"待定"——"≥5min"若无上界，长越限会永远在经济性窗内算合格；**需定上限**（如 30 min）。
-- **阈值管理表 schema**：首批阈值数值、变更是否回溯重算（v3.4 §5.3 倾向**不回算**，带 `effective_from/to`，仅影响生效期之后）。注：判定已改为指令级包络，v3.4 `busbar_threshold`（`tolerance_v` + `plan_SV` 口径）的角色需重新定位——指令级判定用的是 `warn_info` 目标 + 包络区间，不再读 `plan_SV`/`tolerance_v`。
-- **草稿本身待定稿**（草稿 §2.8）：目标值/增量解码的位定义（增量第 2 位"循环码"含义）、缺数据策略、多条指令时间重叠处理——待真实数据验证。
-- **文档同步债**：v3.4 / `docs/外部数据源.md` / 核心算法流程图 仍写旧 `average_SV` + `plan_SV` 模型，与草稿冲突——以草稿为准，但改动前先核对各文档当前说法。
+- **`tolerance_v` 新角色**：判定已改指令级包络，v3.4 `busbar_threshold.tolerance_v` 不再作判定核心，角色待重新定位。表结构可先建（§6.2.4），数值/角色待算法定。
+- **草稿本身待定稿**（草稿 §2.8）：目标值/增量解码的位定义（增量第 2 位"循环码"含义）、缺数据策略、多条指令时间重叠处理、退出原因来源——待真实数据验证。
+- **文档同步债**：v3.4 / `docs/外部数据源.md` / 核心算法流程图 仍写旧 `average_SV` + `plan_SV` 模型，与草稿冲突——以草稿为准。
 - **500kV 母线数据缺失**：`busbar` / `busbar_threshold` / `yc_point_map` 均待现场补录。
-- **后端落地**：`ruoyi-vqms` 模块、build/test 命令、真实数据验证均未开始。
+- **门控点未补录**：远方就地总/AVC投退 `yc_num` 未拿到，门控关当前空转。
+- **后端落地**：`ruoyi-vqms` 模块、build/test 命令、真实数据验证均未开始（确定轨可立即推进 D1~D6，见 v4.0 §12.1）。
 
 ## Security
 
 - `docs/tmp.md`（scratch 笔记）**含明文 DB 凭证**（MySQL root 密码、主机）。仓库公开前：从 git 历史擦除密码并轮换。**不要再往受跟踪文件写新秘密。**
-- `.env`（规划中）绝不提交——含外部源连接串、MySQL root 密码（仅初始化用）、应用 DB 账号凭证、Redis 地址、JWT secret。**应用运行时用最小权限账号（如 `vqms_app`）连接，不用 root**——root 仅首次初始化（建库/建表、`CREATE USER` + `GRANT`）；账号拆分见 v3.1 §9。
+- `.env`（规划中）绝不提交——含外部源连接串、MySQL root 密码（仅初始化用）、应用 DB 账号凭证、Redis 地址、JWT secret。**应用运行时用最小权限账号（如 `vqms_app`）连接，不用 root**——root 仅首次初始化（建库/建表、`CREATE USER` + `GRANT`）；账号拆分见 v4.0 §11。

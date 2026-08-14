@@ -129,8 +129,8 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 | 字段 | 角色 | 说明 |
 |---|---|---|
 | `high_SV` / `low_SV` | **判定用**（聚合进包络区间） | 窗口观测极值，取 max/min 构成 `[L,H]` |
-| `average_SV` | 不参与判定 | 旧模型用它，草稿已弃 |
-| `plan_SV` | 不参与判定 | 目标来自 `warn_info`；样例值 `10245` 是废值，跳过+记日志，不解码 |
+| `average_SV` | **废值**（不考察） | Leo 2026-08-14 定：当废值处理，source 层不映射；旧模型用，已彻底弃 |
+| `plan_SV` | **废值**（不考察） | 目标来自 `warn_info`；样例值 `10245` 是废值，跳过+记日志，不解码 |
 
 ### 两档关系（平行独立，不 fall-through）
 
@@ -151,7 +151,7 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 - **`his_curve_sv` 无主键、无索引**。读取须自行去重 + 按 `(save_time, busbar_num)` 排序。
 - **双写**：每分钟写一条 busbar `0` + 一条 busbar `1`。所有统计按 `busbar_num` 分组。
 - **时间原则：就近取整到分钟（秒 ≥ 30 进位）**。`his_curve_sv` 和 `yc_history`（毫秒精度 `save_time`）的原始时间戳在任何逐分钟聚合前**就近取整到分钟**——秒 ≥ 30 进位，< 30 舍去。这是所有逐分钟判定与汇总的对齐基础；**不要 floor/截断，也不要按原始秒分组**。
-- **逐分钟字段语义**：每行 `his_curve_sv` 是一个分钟级采集窗口。`high_SV`/`low_SV` = 窗口观测最大/最小值——**判定用**（聚合进包络区间 `[min(low), max(high)]`，见上「判定模型」）；`average_SV` = 窗口均值——旧模型用，草稿已弃；`plan_SV` = AVC 调度设定值——**不参与判定**（目标来自 `warn_info`），样例值 `10245` 是**废值**，跳过+记日志，**不解码**（不查 `ori_code`、不反推公式）。
+- **逐分钟字段语义**：每行 `his_curve_sv` 是一个分钟级采集窗口。`high_SV`/`low_SV` = 窗口观测最大/最小值——**判定用**（聚合进包络区间 `[min(low), max(high)]`，见上「判定模型」）；`average_SV` / `plan_SV` = **废值，不考察**（Leo 2026-08-14 定：当废值处理，source 层不映射、判定/统计不依赖）；旧模型用它们，已彻底弃。
 - **Rollup 加权（关键）**：月统计由日表汇总、年由月表，经 MySQL `INSERT...SELECT...GROUP BY...ON DUPLICATE KEY UPDATE` 对**分钟计数**求和（完整 DDL + rollup SQL 见 v3.4 §5.2 / v3.1 §6.3）。**绝不直接平均率列**——重算 `qualification_rate = SUM(qualified_minutes)/SUM(total_minutes)*100` 等；`avg_SV` 按 `total_minutes` 加权。（UPSERT 中 `VALUES(col)` 自 MySQL 8.0.20 起废弃但仍可用；别名写法见 v3.1 §6.3。）
 
 ### Source-data 验证注意（非硬约束，影响测试设计）

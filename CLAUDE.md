@@ -32,7 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **MySQL 8.4** — 唯一持久化主库。存 RuoYi `sys_*` 管理表 + VQMS 管理表（`busbar` 等）+ 派生统计；**绝不存原始业务数据**。（v2 选 PostgreSQL；v3.1 改为 MySQL——RuoYi 是 MySQL 原生，零方言/脚本迁移。）
 - **Redis** — RuoYi 必需（登录 token、验证码、限流、字典/配置缓存）。
-- **External source** — 只读业务数据（`his_curve_sv` 原始曲线、`yc_history` 遥测/门控、`warn_info` 指令）。当前 MySQL 5.7 @ `10.0.0.9`，按可替换设计。经 RuoYi 多数据源（`@DataSource(SLAVE)`）作只读从库接入。
+- **External source** — 只读业务数据（`his_curve_sv` 原始曲线、`yc_history` 遥测/门控、`warn_info` 指令）。当前 MySQL 5.7 @ `10.0.0.9`，按可替换设计。经 RuoYi 多数据源（`@DataSource(SLAVE)`）作只读从库接入。**外部源唯一 = 10.0.0.9**——`docs/外部DB/his_curve_sv.md`、`his_curve_tables.md`、`docs/tmp.md` 探查记录及 `backup/` 旧规划里的 `10.0.0.35`（鸡西 QCzt AVC 盒子）是 v1 期早期采样来源，**2026-08-15 Leo 定：不纳入范围、完全不用考虑**（勿再列入核对/接入清单）。
 - **Auth** — RuoYi 的 Spring Security + JWT，原样复用。
 - **Backend** = RuoYi 6 个原生模块 **+ 新增 `ruoyi-vqms` 业务模块**：`source/`（外部只读层）、`statistics/`（合格率算法，**判定搁置为接口+stub**）、`ingestion/`（Quartz 预计算作业，**搁置**）。VQMS 控制器位于 `com.ruoyi.web.controller.vqms`。
 - 统计模块被查询控制器和 Quartz 作业**进程内直调**（无 Feign、无网关）。

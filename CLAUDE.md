@@ -18,10 +18,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 项目规划 v3.4 / v3.1 / v3.2 / v3.3 | `docs/` 或 `backup/` | Superseded（v4.0 已整合其内容） |
 | 项目规划 v1 / v2 | `backup/` | Superseded（微服务 / 自研单体+PG） |
 | AVC考核核心算法_草稿.md | `docs/AVC考核核心算法_草稿.md` | ✅ **算法口径权威**（2026-08-13 Leo 拍板以此为准），含投运率(§一)+调节合格率(§二)+两档平行模型(§2.4–2.7)。草稿自述仍待真实数据定稿，但**判定口径以此为准**。v4.0 §8 把判定实现搁置为接口+stub |
-| 外部数据源.md | `docs/外部数据源.md` | 外部库字段语义权威 |
+| 外部数据源.md | `docs/外部DB/外部数据源.md` | 外部库字段语义权威（2026-08-15 自 docs/ 根移入 外部DB/） |
 | 核心算法流程图（含通俗版） | `docs/核心算法流程图/` | 辅助理解，以规划文档为准 |
 | 政策口径（附件6、分档考核、免考） | `docs/政策口径/` | AVC 考核政策原文 |
-| 部署 / 迁移 / 品牌去除计划 | `docs/` | 运维与改造 |
+| 部署 / 迁移 / 品牌去除计划 | `docs/部署/` | 运维与改造（2026-08-15 自 docs/ 根移入 部署/） |
 | 外部 DB 表 schema + 样例 | `docs/外部DB/` | 含 `his_curve_sv.md` 等 |
 
 > ⚠️ `docs/` 下另有 `tmp.md`（scratch 笔记，**含明文 DB 凭证**，见 Security）、`数据源头（草稿）.md`、`外部源表优化建议.md` 等——非权威，仅供参考。
@@ -157,7 +157,7 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 ### Source-data 验证注意（非硬约束，影响测试设计）
 
 - 样例数据（10.0.0.9 `qheatavchisdb`，**合成测试库**）**已有窗口摆幅**——2026-08-14 实查：1324 行 100% `high≠low`（222~225 波动，非退化稳态），包络「夹住」分支可测；**越限分支与增量第 2 位循环码仍需生产数据**（合成样本第 2 位全=2、零变化，验证不了语义）。样例导出见 `docs/外部DB/qheatavchisdb_样本导出.md`；生产样本须向对端 AVC 系统要。连接须显式 `utf8mb4`，否则中文变 `?`（已实证）。
-- `BUSBAR_VRateParameter` 表**明确排除**，不参与任何计算（见 `docs/外部数据源.md` §3.2）。判定用阈值来自 VQMS 自管表（RuoYi 后台可编辑），其 schema、首批值、变更回算策略**待定**（见下 Open follow-ups）。
+- `BUSBAR_VRateParameter` 表**明确排除**，不参与任何计算（见 `docs/外部DB/外部数据源.md` §3.2）。判定用阈值来自 VQMS 自管表（RuoYi 后台可编辑），其 schema、首批值、变更回算策略**待定**（见下 Open follow-ups）。
 
 ## ⚠️ Open follow-ups（待办，非既定事实）
 
@@ -169,7 +169,7 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 - **✅ 电压等级维度定位已定（2026-08-15 Leo）**：**不建独立统计维度**（考核口径厂级、`v_grade` 经 join `busbar` 恒可得、搁置轨统计 DDL 不加冗余列）。落地 = RuoYi 字典 `vqms_v_grade`（0=500kV / 1=220kV / 2=66kV及以下·预留，编码与 `busbar.v_grade` 对齐勿改，DDL 在 `sql/vqms.sql` 第六节）+ 前端母线维度 5 页（curve/daily/monthly/yearly/threshold）电压等级筛选与母线级联（后端 list 行须带 `vGrade`，join `busbar`）；avc-runtime / avc-regulation 为并网主体（厂级）口径**不加**。详见 `docs/项目规划_v4_0_修订待办.md` A8。
 - **`tolerance_v` 新角色**：判定已改指令级包络，v3.4 `busbar_threshold.tolerance_v` 不再作判定核心，角色待重新定位。表结构可先建（§6.2.4），数值/角色待算法定。
 - **草稿本身待定稿**（草稿 §2.8）：目标值/增量解码的位定义（增量第 2 位"循环码"含义）、缺数据策略、退出原因来源——待真实数据验证。（✅ 多条指令时间重叠已定：5 分钟间隔 + 窗口 5 分钟 → 不重叠。）
-- **文档同步债**：v3.4 / `docs/外部数据源.md` / 核心算法流程图 仍写旧 `average_SV` + `plan_SV` 模型，与草稿冲突——以草稿为准。
+- **文档同步债**：v3.4 / `docs/外部DB/外部数据源.md` / 核心算法流程图 仍写旧 `average_SV` + `plan_SV` 模型，与草稿冲突——以草稿为准。
 - **500kV 母线数据缺失**：`busbar` / `busbar_threshold` / `yc_point_map` 均待现场补录。
 - **门控点未补录**：远方就地总/AVC投退 `yc_num` 未拿到，门控关当前空转。
 - **后端落地**：`ruoyi-vqms` 模块、build/test 命令、真实数据验证均未开始（确定轨可立即推进 D1~D6，见 v4.0 §12.1）。

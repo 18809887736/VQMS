@@ -12,10 +12,14 @@
           style="width: 380px"
         />
       </el-form-item>
+      <el-form-item label="电压等级" prop="vGrade">
+        <el-select v-model="queryParams.vGrade" placeholder="电压等级" clearable style="width: 160px" @change="handleVGradeChange">
+          <el-option v-for="dict in vqms_v_grade" :key="dict.value" :label="dict.label" :value="dict.value" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="母线" prop="busbarNum">
         <el-select v-model="queryParams.busbarNum" placeholder="母线" style="width: 160px">
-          <el-option label="主母线 (0)" value="0" />
-          <el-option label="副母线 (1)" value="1" />
+          <el-option v-for="b in busbarOptions" :key="b.busbarNum" :label="`${b.busbarName} (${b.busbarNum})`" :value="b.busbarNum" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -38,15 +42,33 @@ import * as echarts from 'echarts'
 import { listCurve } from '@/api/vqms/curve'
 
 const { proxy } = getCurrentInstance()
+const { vqms_v_grade } = proxy.useDict('vqms_v_grade')
 const chartRef = ref(null)
 const loading = ref(false)
 const hasData = ref(false)
 let chartInstance = null
 
+// 阶段 2 占位：与 sql/vqms.sql busbar 种子数据一致；后端 /vqms/busbar 列表接口就绪后改为接口拉取
+const busbarList = [
+  { busbarNum: '0', busbarName: '220kV 东母线', vGrade: '1' },
+  { busbarNum: '1', busbarName: '220kV 西母线', vGrade: '1' }
+]
+const busbarOptions = computed(() =>
+  queryParams.vGrade ? busbarList.filter(b => b.vGrade === queryParams.vGrade) : busbarList
+)
+
 const queryParams = reactive({
   timeRange: [],
+  vGrade: undefined,
   busbarNum: '0'
 })
+
+function handleVGradeChange() {
+  // 等级切换后当前母线若不在该等级下，落到该等级第一条母线，避免组合出空结果
+  if (queryParams.busbarNum && !busbarOptions.value.some(b => b.busbarNum === queryParams.busbarNum)) {
+    queryParams.busbarNum = busbarOptions.value[0]?.busbarNum
+  }
+}
 
 // 阶段 2：后端未就绪时用 mock 数据渲染曲线骨架
 const mockCurve = () => {
@@ -87,6 +109,7 @@ function handleQuery() {
   listCurve({
     beginTime: queryParams.timeRange?.[0],
     endTime: queryParams.timeRange?.[1],
+    vGrade: queryParams.vGrade,
     busbarNum: queryParams.busbarNum
   }).then(response => {
     // 后端就绪后：response.rows 转为 times/high/low/avg 渲染

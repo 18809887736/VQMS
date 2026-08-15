@@ -166,6 +166,7 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 - **✅ 判定口径 + 落库方向已定（2026-08-13 Leo 拍板：以草稿 §2 为准）**：指令级统计，分母=发令次数，两档平行；`V_target` 来自 `warn_info` 解码（不用 `plan_SV`）；判定 = `V_target ∈ [high_SV/low_SV 包络并集]`。v3.4 分钟级 `voltage_quality_*` 表不复用作调节合格率落库。
 - **✅ 工程策略：算法搁置预留（v4.0 §8/§12）**：判定实现为 `RegulationJudge` 接口 + `StubRegulationJudge` 占位；调节/投运率落库 DDL + Quartz 编排留空壳。确定轨（source 只读层/管理表/时间工具/闸门/脚手架/前端）照常推进，不被算法推翻。
 - **✅ `T_econ` 已定（2026-08-14 Leo）= 5 min**（写死）。现场 AVC 指令实际 5 分钟间隔 → 判定窗口 = 5 分钟，经济性档窗口 [`T_fast`+1, 5]；**「无上限」隐患消除、指令重叠不发生**。落地见 `docs/项目规划_v4_0_修订待办.md` A6。
+- **✅ 电压等级维度定位已定（2026-08-15 Leo）**：**不建独立统计维度**（考核口径厂级、`v_grade` 经 join `busbar` 恒可得、搁置轨统计 DDL 不加冗余列）。落地 = RuoYi 字典 `vqms_v_grade`（0=500kV / 1=220kV / 2=66kV及以下·预留，编码与 `busbar.v_grade` 对齐勿改，DDL 在 `sql/vqms.sql` 第六节）+ 前端母线维度 5 页（curve/daily/monthly/yearly/threshold）电压等级筛选与母线级联（后端 list 行须带 `vGrade`，join `busbar`）；avc-runtime / avc-regulation 为并网主体（厂级）口径**不加**。详见 `docs/项目规划_v4_0_修订待办.md` A8。
 - **`tolerance_v` 新角色**：判定已改指令级包络，v3.4 `busbar_threshold.tolerance_v` 不再作判定核心，角色待重新定位。表结构可先建（§6.2.4），数值/角色待算法定。
 - **草稿本身待定稿**（草稿 §2.8）：目标值/增量解码的位定义（增量第 2 位"循环码"含义）、缺数据策略、退出原因来源——待真实数据验证。（✅ 多条指令时间重叠已定：5 分钟间隔 + 窗口 5 分钟 → 不重叠。）
 - **文档同步债**：v3.4 / `docs/外部数据源.md` / 核心算法流程图 仍写旧 `average_SV` + `plan_SV` 模型，与草稿冲突——以草稿为准。

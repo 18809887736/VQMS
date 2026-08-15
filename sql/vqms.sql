@@ -25,6 +25,7 @@
 --   * 所有 busbar_num 由 smallint 改为 bigint(20)，对齐外部源 his_curve_sv.busbar_num 真实类型
 --   * voltage_quality_group_daily（§5.7.5）M2+ 待补，本脚本暂注释不执行
 --   * precompute_cursor PK 由 busbar_num 改为 group_num（§5.7.3 rollup 按组推进；游标推进与组内日表 UPSERT 同事务，避免组内母线游标分叉）
+--   * 2026-08-15 新增第六节 vqms_v_grade 电压等级字典（修订待办 A8：等级=母线属性+前端筛选，不建独立统计维度）
 -- ============================================================
 
 
@@ -238,3 +239,19 @@ create table precompute_cursor (
 -- 按 CLAUDE.md "不改 RuoYi 原生模块"，不直接改 ry_20260417.sql，而在本脚本末尾覆盖
 -- 首启执行顺序 00-create-app-user.sh → quartz.sql → ry_*.sql → vqms.sql，本 UPDATE 最后跑，覆盖 ry 初始值
 UPDATE sys_config SET config_value = 'false' WHERE config_key = 'sys.account.captchaEnabled';
+
+
+-- ============================================================
+-- 六、VQMS 字典（2026-08-15 修订待办 A8：电压等级维度定位）
+--   vqms_v_grade：编码与 busbar.v_grade / busbar_group.v_grade 严格对齐（0=500kV,1=220kV），勿改值
+--   2=66kV及以下为预留档：本站暂无该等级母线，现场出现时录入 busbar 行即可启用，模型/字典结构不变
+--   delete+insert 按 dict_type 幂等，可重复执行；dict_id/dict_code 走自增不写死
+-- ============================================================
+delete from sys_dict_data where dict_type = 'vqms_v_grade';
+delete from sys_dict_type where dict_type = 'vqms_v_grade';
+insert into sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
+values ('电压等级', 'vqms_v_grade', '0', 'admin', sysdate(), 'VQMS 电压等级（编码对齐 busbar.v_grade：0=500kV,1=220kV,2=66kV及以下预留）');
+insert into sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
+values (1, '500kV',      '0', 'vqms_v_grade', '', 'danger',  'N', '0', 'admin', sysdate(), ''),
+       (2, '220kV',      '1', 'vqms_v_grade', '', 'primary', 'N', '0', 'admin', sysdate(), ''),
+       (3, '66kV及以下', '2', 'vqms_v_grade', '', 'info',    'N', '0', 'admin', sysdate(), '预留档：现场出现 66kV 母线时启用；容差口径为 ±1% 额定电压，异于固定 kV 档');

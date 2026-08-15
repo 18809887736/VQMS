@@ -11,10 +11,14 @@
           style="width: 200px"
         />
       </el-form-item>
+      <el-form-item label="电压等级" prop="vGrade">
+        <el-select v-model="queryParams.vGrade" placeholder="电压等级" clearable style="width: 160px" @change="handleVGradeChange">
+          <el-option v-for="dict in vqms_v_grade" :key="dict.value" :label="dict.label" :value="dict.value" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="母线" prop="busbarNum">
         <el-select v-model="queryParams.busbarNum" placeholder="母线" clearable style="width: 160px">
-          <el-option label="主母线 (0)" value="0" />
-          <el-option label="副母线 (1)" value="1" />
+          <el-option v-for="b in busbarOptions" :key="b.busbarNum" :label="`${b.busbarName} (${b.busbarNum})`" :value="b.busbarNum" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -34,6 +38,9 @@
       <el-table-column label="统计年份" prop="statYear" width="120" />
       <el-table-column label="母线" prop="busbarNum" width="80">
         <template #default="scope">{{ scope.row.busbarNum === '0' ? '主母线' : '副母线' }}</template>
+      </el-table-column>
+      <el-table-column label="电压等级" width="100" align="center">
+        <template #default="scope"><dict-tag :options="vqms_v_grade" :value="scope.row.vGrade" /></template>
       </el-table-column>
       <el-table-column label="总分钟数" prop="totalMinutes" width="100" />
       <el-table-column label="合格分钟" prop="qualifiedMinutes" width="100" />
@@ -57,6 +64,7 @@
 import { listYearly } from '@/api/vqms/voltageYearly'
 
 const { proxy } = getCurrentInstance()
+const { vqms_v_grade } = proxy.useDict('vqms_v_grade')
 
 const dataList = ref([])
 const loading = ref(true)
@@ -68,10 +76,27 @@ const data = reactive({
     pageNum: 1,
     pageSize: 10,
     statYear: undefined,
+    vGrade: undefined,
     busbarNum: undefined
   }
 })
 const { queryParams } = toRefs(data)
+
+// 阶段 2 占位：与 sql/vqms.sql busbar 种子数据一致；后端 /vqms/busbar 列表接口就绪后改为接口拉取
+const busbarList = [
+  { busbarNum: '0', busbarName: '220kV 东母线', vGrade: '1' },
+  { busbarNum: '1', busbarName: '220kV 西母线', vGrade: '1' }
+]
+const busbarOptions = computed(() =>
+  queryParams.value.vGrade ? busbarList.filter(b => b.vGrade === queryParams.value.vGrade) : busbarList
+)
+
+function handleVGradeChange() {
+  // 等级切换后当前母线若不在该等级下，落到该等级第一条母线，避免组合出空结果
+  if (queryParams.value.busbarNum && !busbarOptions.value.some(b => b.busbarNum === queryParams.value.busbarNum)) {
+    queryParams.value.busbarNum = busbarOptions.value[0]?.busbarNum
+  }
+}
 
 function getList() {
   loading.value = true

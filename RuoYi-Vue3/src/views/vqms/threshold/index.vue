@@ -1,6 +1,11 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" v-show="showSearch" :inline="true" label-width="80px">
+      <el-form-item label="电压等级" prop="vGrade">
+        <el-select v-model="queryParams.vGrade" placeholder="电压等级" clearable style="width: 160px">
+          <el-option v-for="dict in vqms_v_grade" :key="dict.value" :label="dict.label" :value="dict.value" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="母线编号" prop="busbarNum">
         <el-input v-model="queryParams.busbarNum" placeholder="母线编号" clearable style="width: 200px" @keyup.enter="handleQuery" />
       </el-form-item>
@@ -80,6 +85,7 @@
 import { listThreshold, getThreshold, addThreshold, updateThreshold, delThreshold } from '@/api/vqms/threshold'
 
 const { proxy } = getCurrentInstance()
+const { vqms_v_grade } = proxy.useDict('vqms_v_grade')
 
 const dataList = ref([])
 const open = ref(false)
@@ -96,6 +102,7 @@ const data = reactive({
   queryParams: {
     pageNum: 1,
     pageSize: 10,
+    vGrade: undefined,
     busbarNum: undefined
   },
   rules: {

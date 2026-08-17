@@ -14,6 +14,25 @@
 1. **先轮换，后擦除**。密码一旦进入过公开仓库就视为已被获取，擦除历史不能撤销这件事；真正的止血是**轮换 10.0.0.35 的 MySQL root 密码**（需现场/对端协调；换之前确认 AVC 盒子自身的数据写入服务没用 root 连库）。轮换与本方案完全解耦、先行。
 2. 历史擦除是防扩散与合规善后：避免未来任何 clone/缓存再取到该密码。
 
+### 2.1 现场执行卡（转给管理 10.0.0.35 盒子的人）
+
+> 2026-08-17 实测：本工作站与 10.0.0.9 均无路由到 10.0.0.35（No route to host）——轮换只能在现场 / 该盒子所在网络执行。
+
+```sql
+-- ① 先看：有没有服务在用 root 远程连库（看 root 的 host 分布与当前连接来源）
+SELECT user, host FROM mysql.user WHERE user = 'root';
+SHOW FULL PROCESSLIST;
+
+-- ② 换掉远程 root。注意 root@'%' 与 root@'localhost' 是两个账号：
+--    盒子上本机服务若走 localhost socket 连库，不受此改动影响
+ALTER USER 'root'@'%' IDENTIFIED BY '<新的强随机密码>';
+
+-- ③ 可选（更彻底）：该盒子已不归 VQMS 使用，若无远程维护需求，直接禁用远程 root
+-- DROP USER 'root'@'%';
+```
+
+④ 验证：旧密码远程登录被拒（若走 ② 则新密码可登录）；AVC 数据仍在写入（`qheatavchisdb` 的 `yc_curve` / `his_curve_sv` 行数持续增长）。
+
 ## 3. 执行前检查清单（Leo）
 
 - [ ] 10.0.0.35 root 密码已轮换（或已与现场约期）

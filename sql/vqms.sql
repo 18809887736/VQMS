@@ -24,7 +24,7 @@
 --   * tolerance_v：int 伏特旧口径（220kV=300 / 500kV=500）→ decimal(10,3) kV 权威值 1.000 / 1.500
 --     （v4.1 §6.2.4 / §7.1；旧口径 v3.2 起文档层已作废，本次物理 DDL 跟上）
 --   * 删除 v3.x 分钟级统计表 voltage_quality_daily/monthly/yearly、组级空档审计、precompute_cursor：
---     判定已改指令级口径（AVC考核核心算法_草稿 §2），分钟级表不能复用（v4.1 §6.3）；
+--     判定已改指令级口径（AVC考核核心算法_草稿4_1 §2），分钟级表不能复用（v4.1 §6.3）；
 --     统计表随搁置轨（§12.2 S2/S3/S4）解封后另出 DDL，勿从 v3.x 版本恢复旧表
 --   * 新增 vqms_judge_param 判定整定参数表（修订待办 A6 / 确定轨 D7）
 --   * busbar.v_grade 注释补 2=66kV及以下(预留)，与字典 vqms_v_grade 对齐
@@ -55,8 +55,10 @@ create table busbar_group (
 ) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 母线组（主母线判定单元）';
 
 -- 初始数据：220kV 组已知；500kV 组占位待补，指示点号现场补录前该组不参与统计
+-- 主母线号指示点 4001 = 合成库 points.yaml 体系（tools/avc-data-gen/config/points.yaml）；
+-- 原 3008 为早期探查遗留、合成库不存在。真实现场点号到位后改（Leo 2026-08-17 拍板对齐）。
 insert into busbar_group (group_num, group_name, v_grade, main_indicator_yc_num, default_main_busbar_num, max_staleness_minutes) values
-  (0, '220kV母线组', 1, 3008, 0, 30),
+  (0, '220kV母线组', 1, 4001, 0, 30),
   (1, '500kV母线组', 0, null, null, 30);
 
 
@@ -127,12 +129,15 @@ create table yc_point_map (
   primary key (yc_num)
 ) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='yc_history 遥测点编码映射';
 
--- 初始数据（真实点位：3008 = 220kV 组主母线号指示点）
+-- 初始数据：点号对齐合成库 points.yaml 体系（tools/avc-data-gen/config/points.yaml）；
+-- 原 3008 为早期探查遗留、合成库不存在，真实现场点号到位后改。
+-- 3009（AVC投退）gate_enabled=0 保守默认：防全新部署真实环境误用合成点号开门控；
+-- 合成库联调开门控时在测试环境手动置 1（4001 主母线号指示点无门控语义，不受影响）。
 insert into yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
-  (3008, '主母线号', 'busbar_id', null, null, 0);
--- ⚠️ 待现场补录两个 yx 门控点（远方就地总、AVC投退）的 yc_num，确认后插入并置 gate_enabled=1：
--- (<yc_num>, '远方就地总', 'yx', '远方', '就地', 1),
--- (<yc_num>, 'AVC投退',   'yx', '投入', '退出', 1);
+  (4001, '主母线号', 'busbar_id', null, null, 0),
+  (3009, 'AVC投退', 'yx', '投入', '退出', 0);
+-- ⚠️ 待现场补录：远方就地总 yx 门控点 yc_num，确认后插入并置 gate_enabled=1：
+-- (<yc_num>, '远方就地总', 'yx', '远方', '就地', 1);
 
 
 -- 5、判定整定参数（§6.2.5，v4.1 新增；RuoYi 代码生成 CRUD → /vqms/judgeParam + Redis 缓存 vqms:judgeParam:{key}）
@@ -188,7 +193,7 @@ create table vqms_command_ledger (
 -- ============================================================
 -- 原 v3.2 版本此处的 voltage_quality_daily / voltage_quality_monthly / voltage_quality_yearly、
 -- voltage_quality_group_daily（注释块）、precompute_cursor 已整体删除：
---   * 判定口径已改为指令级（AVC考核核心算法_草稿 §2：分母=发令次数、两档平行），
+--   * 判定口径已改为指令级（AVC考核核心算法_草稿4_1 §2：分母=发令次数、两档平行），
 --     分钟级 / average_SV / plan_SV 口径的统计表不能复用作调节合格率落库（v4.1 §6.3）；
 --   * 指令级统计表（指令明细 + 日/月/年 rollup）、投运率时间记账表、预计算游标
 --     属搁置轨 S2/S3/S4，待算法定稿后设计并另出 DDL——勿从 v3.x 版本恢复旧表。

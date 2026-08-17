@@ -4,7 +4,8 @@
 -- ⚠️⚠️ 破坏性脚本，严禁对已有数据的环境重复执行 ⚠️⚠️
 --   每张表开头都是 DROP TABLE IF EXISTS——重跑会清空重建：
 --   busbar / busbar_group / busbar_threshold / yc_point_map / vqms_judge_param 等人工维护的配置表
---   会回到初始种子数据，现场已录入的母线（如 500kV）、调整过的容差/整定参数、补录的点位全部丢失。
+--   会回到初始种子数据，现场已录入的母线（如 500kV）、调整过的容差/整定参数、补录的点位全部丢失
+--   （vqms_command_ledger 为只增流水账，重跑会清空——可从外部源重抓，无人工数据损失）。
 --   仅限全新部署首启执行；线上变更表结构请用 ALTER 或增量迁移脚本，勿整脚本重跑。
 --
 -- 与 RuoYi sys_* 表同库；库名由 docker MYSQL_DATABASE 决定，本脚本不含 CREATE DATABASE/USE
@@ -16,6 +17,7 @@
 --   §6.2.3 yc_point_map      yc_history 遥测点语义映射
 --   §6.2.4 busbar_threshold  阈值（带生效区间；tolerance_v 占位/角色待定）
 --   §6.2.5 vqms_judge_param  判定整定参数（t_fast / t_econ / 分档阈值）
+--   §6.2.6 vqms_command_ledger  AVC 指令流水账（原始事实只增表，确定轨 D8）
 --   字典 vqms_v_grade → 本脚本第六节
 --
 -- v4.1 对齐变更（2026-08-17，相对 v3.2 版本）：
@@ -27,6 +29,8 @@
 --   * 新增 vqms_judge_param 判定整定参数表（修订待办 A6 / 确定轨 D7）
 --   * busbar.v_grade 注释补 2=66kV及以下(预留)，与字典 vqms_v_grade 对齐
 --   * 保留 2026-08-15 第六节 vqms_v_grade 字典（修订待办 A8），节号不动
+--   * 2026-08-17 新增 vqms_command_ledger 指令流水账（Leo 拍板 review I1-b：搁置期计数契约的
+--     落库目标，存储切分铁律唯一有界例外，见 v4.1 §4/§6.2.6）
 -- ============================================================
 
 
@@ -73,7 +77,8 @@ create table busbar (
   primary key (busbar_num)
 ) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 主母线元数据';
 
--- 初始数据（220kV 两条；500kV 待现场补录）
+-- 初始数据（220kV 东/西母线——对齐外部 BUSBAR 注册表样本（docs/外部DB/外部数据源.md）；
+--   warn_info 告警/状态文本对同一对母线称「正母线/副母线」，两套称呼矛盾，最终以现场确认为准；500kV 待现场补录）
 insert into busbar (busbar_num, busbar_name, v_grade, group_num, nominal_kv) values
   (0, '220kV 东母线', 1, 0, 220.000),
   (1, '220kV 西母线', 1, 0, 220.000);
@@ -88,7 +93,7 @@ create table busbar_threshold (
   busbar_num             bigint(20)    not null                comment '母线编号（逻辑 FK → busbar.busbar_num）',
   criterion_type         varchar(8)    not null default 'AVC'  comment '口径：AVC=控制达标率 / GB=国标±10%',
   tolerance_v            decimal(10,3) default null            comment 'AVC 容差(kV)：220kV=1.000, 500kV=1.500；GB 口径为空。⚠️占位/角色待定，禁用旧 |average_SV−plan_SV|≤tolerance_v 口径',
-  plan_sv_invalid_policy varchar(20)   not null default 'SKIP' comment 'plan_SV 废值策略：SKIP/COUNT_UNQUALIFIED/FALLBACK',
+  plan_sv_invalid_policy varchar(20)   not null default 'SKIP' comment 'plan_SV 废值策略：SKIP/COUNT_UNQUALIFIED/FALLBACK。⚠️旧 plan_SV 模型遗留列：plan_SV 已废值不读、暂无消费方，角色随 tolerance_v 一并待算法定稿重定',
   effective_from         date          not null                comment '生效起始日（含）',
   effective_to           date          default null            comment '生效结束日（含），NULL=至今有效',
   create_by              varchar(64)   default ''              comment '创建者',
@@ -158,6 +163,24 @@ insert into vqms_judge_param (param_key, param_value, name, description, value_m
   ('t_econ',              5, '经济性档窗口上限(分钟)', '写死=5（指令 5 分钟间隔），锁定不可改',    5, 5),
   ('tier_threshold_fast', 1, '快速性档分档阈值(分钟)', '附件6 政策值，锁定',                       1, 1),
   ('tier_threshold_econ', 5, '经济性档分档阈值(分钟)', '附件6 政策值，锁定',                       5, 5);
+
+
+-- 6、AVC 指令流水账（§6.2.6，2026-08-17 新增；确定轨 D8）
+--    搁置期计数契约（§8.6「原始事实只记不判」）的落库目标：外部源 warn_info 电压指令（warn_type=5）的
+--    原始字段只增摘录，不含任何判定/解码结论——undecodable 标志、窗口缺分钟数随搁置轨解封后从本表原文
+--    + 外部源曲线重算。存储切分铁律的唯一有界例外：仅此一张原始摘录表、只增、~288 行/天（见 v4.1 §4/§6.2.6）。
+drop table if exists vqms_command_ledger;
+create table vqms_command_ledger (
+  id           bigint(20)    not null auto_increment comment '主键',
+  warn_time    varchar(32)   not null                comment '指令时间原文（外部源 warn_info.warn_time，varchar 原样保留，格式校验在读取层）',
+  millisecond  varchar(8)    default null            comment '毫秒原文（warn_info.millisecond）',
+  warn_type    int           not null                comment '类型；电压指令=5（本账只收指令；全量告警是否入账随 §14-8 退出原因来源定）',
+  obj_num      bigint(20)    default null            comment '对象编号（现场整定；非 VQMS 管理表引用，不参与逻辑 FK 校验）',
+  warn_content varchar(255)  default null            comment '指令文本原文（目标值/增量值编码在此文本内；解码随搁置轨 judge 实现）',
+  fetched_at   datetime      default current_timestamp comment '抓取入库时间',
+  primary key (id),
+  unique key uk_cmd (warn_time, millisecond, obj_num)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS AVC 指令流水账（原始事实，只增）';
 
 
 -- ============================================================

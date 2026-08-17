@@ -42,7 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 工程决策：核心算法搁置预留（v4.1 核心）
 
 判定算法是最不稳定的一块（草稿 §2 待真实数据定稿）。v4.1 把工程拆**确定轨 / 搁置轨**：
-- **确定轨**（不依赖算法定稿，现在就做）：`source/` 外部只读层、管理表 DDL（`busbar`/`busbar_group`/`yc_point_map`/`busbar_threshold` + `vqms_judge_param` 判定参数表）、时间对齐工具（就近取整到分钟）、格式校验三步闸门（反制 varchar `save_time`）、RuoYi 脚手架对接（菜单/权限 + 7 个前端页面）、前端三阶段。
+- **确定轨**（不依赖算法定稿，现在就做）：`source/` 外部只读层、管理表 DDL（`busbar`/`busbar_group`/`yc_point_map`/`busbar_threshold` + `vqms_judge_param` 判定参数表 + `vqms_command_ledger` 指令流水账）、时间对齐工具（就近取整到分钟；reader 返回原始时间戳、调用方负责取整对齐——v4.1 §5 契约）、格式校验三步闸门（反制 varchar `save_time`）、RuoYi 脚手架对接（菜单/权限 + 7 个前端页面）、前端三阶段。
 - **搁置轨**（等算法定稿）：判定逻辑 → `RegulationJudge` 接口 + `StubRegulationJudge` 占位（**确定性 stub，禁随机**）；调节合格率/投运率落库 DDL；Quartz 预计算编排；**数据不可用处置策略（#3 缺数据/#5 解码失败）随搁置轨同批解封，搁置期计数只记不判**（v4.1 §8.6）。
 - **关键**：判定抽象为接口（输入=指令+窗口逐分钟 high_SV/low_SV+参数，输出=**两档两态**结论 `{QUALIFIED, PENALIZED}`——v4.1 起移除 EXEMPT，免考 = 后置读对端 `yx501` 的应用，非判定产物；整体为「门控前置过滤 → judge 包络判定 → 免考后置应用」三阶段管线），算法定型后**只换实现、不动调用方**（解码留在 judge 实现内）。详见 v4.1 §8/§12。**没定 DDL 前别硬写统计表**——留空壳接口即可。
 
@@ -55,7 +55,7 @@ RuoYi 解决*通用后台管理系统*，**不解决电压质量**。边界要�
 
 ## Storage-split rule（极易违反——必读）
 
-原始电压曲线**绝不复制进 MySQL 主库**。外部源是原始数据的唯一真相源；MySQL 只存可重算的派生统计 + 管理数据。`source/` 层（在 `ruoyi-vqms` 内）是通往外部库的**唯一读路径**，且设计为只读（防误写）。拿不准数据在哪时：**raw = 外部源；管理 + 统计 = MySQL**。
+原始电压曲线**绝不复制进 MySQL 主库**。外部源是原始数据的唯一真相源；MySQL 只存可重算的派生统计 + 管理数据。`source/` 层（在 `ruoyi-vqms` 内）是通往外部库的**唯一读路径**，且设计为只读（防误写）。拿不准数据在哪时：**raw = 外部源；管理 + 统计 = MySQL**。**唯一有界例外**：`vqms_command_ledger`（v4.1 §6.2.6）——`warn_info` 指令原始字段只增摘录表，搁置期计数契约的落库底账（2026-08-17 Leo 拍板）；其余原始数据仍绝不入主库。
 
 ## External-source DB portability
 

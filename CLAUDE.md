@@ -25,7 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 部署 / 迁移 / 品牌去除计划 | `docs/部署/` | 运维与改造（2026-08-15 自 docs/ 根移入 部署/） |
 | 外部 DB 表 schema + 样例 | `docs/外部DB/` | 含 `外部数据源.md`、`qheatavchisdb_样本导出.md` 等 |
 
-> ⚠️ `docs/` 下另有 `tmp.md`（scratch 笔记，**含明文 DB 凭证**，见 Security）、`数据源头（草稿）.md`、`外部源表优化建议.md` 等——非权威，仅供参考。
+> ⚠️ `docs/` 下另有 `tmp.md`（scratch 笔记）、`数据源头（草稿）.md`、`外部源表优化建议.md` 等——非权威，仅供参考。
 
 ## Architecture (v4.0 — RuoYi-Vue base, MySQL decided)
 
@@ -178,5 +178,5 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 
 ## Security
 
-- `docs/tmp.md`（scratch 笔记）**含明文 DB 凭证**（MySQL root 密码、主机）。仓库公开前：从 git 历史擦除密码并轮换。**不要再往受跟踪文件写新秘密。**
+- **不往受跟踪文件写任何秘密**（密码/密钥/连接串/凭证）——示例文件只放占位值，真实值走 `.env`（不入库）或环境变量。
 - `.env`（规划中）绝不提交——含外部源连接串、MySQL root 密码（仅初始化用）、应用 DB 账号凭证、Redis 地址、JWT secret。**应用运行时用最小权限账号（如 `vqms_app`）连接，不用 root**——root 仅首次初始化（建库/建表、`CREATE USER` + `GRANT`）；账号拆分见 v4.1 §11。

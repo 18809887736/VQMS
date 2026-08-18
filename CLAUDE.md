@@ -15,6 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 文档 | 位置 | 状态 |
 |---|---|---|
 | **项目规划_v5_0.md** | `docs/项目规划_v5_0.md` | ✅ **权威**，以此为准（2026-08-18：v4.1 + 策略解耦设计合并——数据不可用策略参数化 + 分轨解封 + 确定轨 D9，supersede v4.1） |
+| **VQMS_测试方案_v5_0.md** | `docs/测试/VQMS_测试方案_v5_0.md` | ✅ **测试口径权威**（伴生文档，基准=规划 v5.0，2026-08-18 重写；不用 Testcontainers，集成测试直连 10.0.0.9；⚠️ 前置：avc-data-gen thresholds.yaml 旧值待对齐拍板值） |
 | 项目规划 v4.1 | `docs/项目规划_v4_1.md` | Superseded（v5.0 已合并其全部内容） |
 | 项目规划 v4.0 + v4.0 修订待办 | `docs/` | Superseded（v4.1 已全量合并） |
 | 项目规划 v3.4 / v3.1 / v3.2 / v3.3 | `docs/` 或 `backup/` | Superseded（v4.0 已整合其内容） |

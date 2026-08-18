@@ -1,0 +1,184 @@
+# VQMS 测试方案 v5.0
+
+> **基准：`docs/项目规划_v5_0.md`（2026-08-18 定稿）**——带「v5.0」前缀的引用（如 v5.0 §8.2）均指规划；**裸 §x 指本方案自身章节**；S01–S19 / U01–U07 是生成器**场景号**（区别于 v5.0 搁置轨条目 S1–S5）。规划升版时同步改本文件头的基准指针与受影响小节。
+> 前身 `VQMS_测试方案_v1_0.md` 已于 2026-08-17 删除（Testcontainers 依赖与开发机无 Docker 冲突）；本文件是重写版，非增量修订。
+> 创建日期：2026-08-18。
+
+## 0. 相对 v1_0 的关键变更（先读，防拿旧口径套新方案）
+
+| 项 | v1_0（已删） | 本版（基准 v5.0） |
+|---|---|---|
+| 基准规划 | v4.0（D1–D6 / S1–S4） | v5.0（**D1–D9 / S1–S5**，新增 D7 判定参数 / D8 指令流水账 / D9 类型化失败契约+策略骨架） |
+| DB 集成测试基础设施 | Testcontainers（CI 现起容器） | **不用 Testcontainers**（开发机无 Docker）——**直连 10.0.0.9**：外部源模拟 = mysql57 容器 `vqms_avc_test` 库；主库 = VQMS compose 的 MySQL 8.4 测试库（§3 环境矩阵） |
+| judge 输出契约 | 三态 `QUAL/PEN/EXEMPT` + SKIP | **两态 `{QUALIFIED, PENALIZED}` + `Undecodable{reason}` 信号通道**（v5.0 §8.2）；免考 = 后置读 `yx501`，**不进 judge** |
+| manifest.json 期望比对 | 直接比对（含 EXEMPT/SKIP） | **两段式映射**（v5.0 §12.2 S1 注，§4.2 本版细化）：EXEMPT 期望 → judge 层断言 `PENALIZED` + 免考层另断言 `yx501=1`；SKIP 期望 → 按 §4.2 映射表落到 `Undecodable`/策略层 |
+| 数据不可用处置 | 随搁置轨同批定 | **分轨解封**（v5.0 §8.7）：策略骨架/参数表属确定轨 D9 现在就测；选套值留空不当默认值 |
+| 门控/免考点位 | 未对齐 | 种子点号已对齐合成库 `points.yaml`（4001 主母线号 / 3009 投退 / 501 免考 / 511·512 并网 / 521·522 退出原因，2026-08-17）；联调置 `gate_enabled=1` 即可端到端 |
+
+## 1. 现状盘点（测试资产先说清楚）
+
+- **后端**：`ruoyi-vqms` 模块**零 Java 代码**（v5.0 §12.1 实施状态核实）——本方案随 D1 起逐项铺开，不预写没有实现可跑的测试。
+- **已落地资产**：`sql/vqms.sql`（六张表 DDL + 字典 + 种子）；前端阶段 1/2（7 页骨架 + 电压等级筛选/级联）。
+- **最大杠杆 = `tools/avc-data-gen`**：
+  - 26 个覆盖全部判定分支的合成场景（S01–S19 调节合格率、U01–U07 投运率）+ `manifest.json`（场景→期望结论，算法侧测试 oracle）；
+  - `tests/test_l0_units.py`（Python L0 单测，含 decode.py 契约级解码参考实现）；
+  - `verify/run_verify.py`（路 A：只读连真实 `qheatavchisdb`，验证 varchar `save_time` 解析/双写去重/排序/亚秒取整）；
+  - 10.0.0.9 mysql57 容器内隔离库 `vqms_avc_test`（与真实 `qheatavchisdb` **同容器库级隔离**、与主库 `ry_vqms` 跨容器隔离）。
+- **真实库已知三缺口**（README）：`his_curve_sv` 退化稳态、`warn_info` 无 `warn_type=5`、`yc_history` 0 条——真实库**只能测读取层，测不了判定分支**。
+
+## 2. 测试分层与总体策略
+
+```
+L0  纯函数单元测试      时间对齐 / decode 解码 / 三步闸门正反例 / 策略评估纯函数（D9）
+L1  组件·数据层集成     source 层读取（直连 vqms_avc_test）/ 管理表 DDL+CRUD+逻辑FK（直连主库测试库）
+L2  契约测试           RegulationJudge 接口：Stub 与未来真实实现共用同一批断言（manifest oracle）
+L3  端到端 / 前端       登录→选母线→曲线→日/月/年报表（真实后端，不 mock）
+L4  数据一致性/回归     真实库上 Java source 层读取结果 vs Python 路 A 脚本结果双方交叉（防实现漂移）
+L5  部署/环境验证       compose 四容器起停、多数据源路由、SELECT-only 账号生效（属部署验证，随部署计划另行执行，不在本方案 §4/§8 铺开）
+```
+
+铺开顺序 = **D1 → D3/D4 → D2 → D5/D7 → D8 → D9 → D6 →（分轨解封后）S1 / S5 应用 / S2–S4**。越靠前的层不依赖算法定稿，现在就能写。
+
+## 3. 测试环境矩阵（无 Testcontainers，全部直连）
+
+| 环境 | 位置 | 用途 | 写权限 |
+|---|---|---|---|
+| 本地 JVM | 开发机，无 DB | L0 纯函数单测（无 Spring 上下文依赖的部分） | — |
+| `vqms_avc_test` | 10.0.0.9 mysql57 容器 | D1 source 层 / L2 契约的**外部源替身**（26 场景；条数/排序与 manifest 核对在 L1/L2 内做） | **只读**（测试不得写此库；重灌走生成器脚本） |
+| 主库测试库 `ry_vqms_test` | 10.0.0.9 VQMS compose 的 mysql:8.4 容器 | D2 管理表 DDL+CRUD / D7 / D8 落库 / D9 策略参数表集成 | 读写（每次跑前重置种子） |
+| 真实 `qheatavchisdb` | 10.0.0.9 mysql57 容器 | 路 A 只读回归 + **L4 Java↔Python 双方交叉比对**（非 CI、人工/定时） | **只读**（SELECT-only 账号强制） |
+| 前端 dev | 本机 `npm run dev` + 后端 | L3 端到端 | 只读 |
+
+- **连接约定**：凭据一律走环境变量（如 `MYSQL57_ROOT_PW`、`VQMS_REALDB_PASSWORD`，README 既有惯例），**不写进任何受跟踪文件或测试代码**。
+- **并发与清理**：单人开发约定 + `ry_vqms_test` 每轮重置种子（重置脚本随 D2 落地）；`vqms_avc_test` 只读断言不污染。
+- **CI**：暂无（v1_0 的 GitHub Actions + Docker-in-Docker 方案随 Testcontainers 一并搁置）。将来若上 CI（runner 有 Docker），可恢复"现起容器 + 灌生成器 SQL"方案，与本地直连流程并存，测试代码不变——只换 profile。
+
+## 4. 分模块测试设计（对齐 v5.0 §12.1 D1–D9 完成标准）
+
+### 4.1 D1 · source/ 外部只读层（L1/L4）
+
+- **读通三表**：按（时间区间, busbar_num）直连 `vqms_avc_test`，断言领域对象字段、条数、排序与 `manifest.json` 一致；**列名速查断言**（v5.0 §5）：`his_curve_sv.save_time` / `yc_history.yc_time` / `warn_info.warn_time`（+ 毫秒另列）。
+- **废值不映射**：`average_SV` / `plan_SV` 在领域对象上**无对应字段**（编译期即不存在，非运行时忽略）——S15（plan_SV=10245 干扰）数据全量通过且判定不受影响。
+- **坏行跳过**：注入脏 `save_time` 样本（null/空串/非法字符/超范围），断言"跳过该行 + WARN 日志，整批不失败"。
+- **时间契约**（v5.0 §5，2026-08-17 定）：取整只发生在两处——D4 ③ 闸门的就近取整**在 reader 内部**用于边界裁剪、窗口对齐由**调用方**经 D3 工具完成（取整幂等，双重取整无害）；**断言对象 = reader 对外出参保持原始毫秒精度**（不因内部裁剪取整而丢精度）。
+- **方言契约基类**：`HisCurveSvReaderContractTest` 抽象基类 + `Mysql57CurveReader` 首个实现；未来 `mysql8/sqlite/postgres` 实现复用同一批用例。
+- **L4 交叉比对**（非 CI）：在**真实 `qheatavchisdb`** 的同一批数据上，Java 读取结果 vs `verify/run_verify.py`（路 A）结果**双方**逐行比对，防 Java 与 Python 验证脚本行为漂移（真实库无 manifest 期望，不与 manifest 比对——manifest 期望的核对在 L1/L2 的合成库内做）。
+
+### 4.2 L2 契约测试 · RegulationJudge + manifest 映射（D9 骨架 / S1 真实现共用）
+
+参数化契约测试（**19 个调节场景 S01–S19** × manifest 期望；U01–U07 投运率场景不经 `RegulationJudge`，不进本契约测试，随 S 轨另设）。**分两档跑，断言代码同一批、零改动**：
+
+- **Stub 档（现在）**：`StubRegulationJudge` 只验**契约形状**——`RegulationOutcome` 类型可构造/可序列化、`stub=true` 标记在、确定性/非随机（下条 bullet）。**Stub 不可能满足 manifest 期望**（S02 期望 PEN 等），期望断言此档**跳过**——v5.0 §8.2 对 stub 的定位就是"能编译、能调通、有返回值，不保证正确"。
+- **真实现档（S1 解封后）**：换 Bean 指向 `DefaultRegulationJudge`，同一批参数化断言按映射表全量生效——**准入门槛 = 19 场景全量通过**。
+
+v5.0 契约是两态 + Undecodable，manifest 是三态时代产物，**期望映射表**：
+
+| manifest 期望 | v5.0 断言 |
+|---|---|
+| `QUAL`（快/经各档） | `Judged` 且该档 `VERDICT=QUALIFIED` |
+| `PEN`（快/经各档） | `Judged` 且该档 `VERDICT=PENALIZED`；**免考层另断言 yx501=0**（未免考） |
+| `EXEMPT`（S05/S06/S07） | **两段式**（v5.0 §12.2 S1 注）：judge 层断言 `PENALIZED` + 免考层（阶段三后置）断言 `yx501=1`——不直接比对 EXEMPT |
+| `SKIP`（S11/S12/S14/S16） | 按原因分流：S11 → `Undecodable{缺t₀电压}`；S12 → `Undecodable{编码脏写}`（**S12 场景只构造了编码脏写一种失败**——`",abc."` 脏文本；`循环码非法` 在 26 场景中**零覆盖**，见 §6-4）；S14 → `Judged{econ: QUALIFIED, fast 档窗口全缺如实反映在 completeness（非 0，econ 窗有数据）}`，fast 档无数据可判（原 manifest SKIP 语义）→ 处置归策略层（§4.8）；S16 `L>H` → 该窗无效 + 记日志（v5.0 §8.5 原口径；**契约承载待 D9 定稿**——并入 `Undecodable` 原因扩展或独立无效信号，§6-4） |
+| S17 双指令 | 按 `obj_num` 分通道各断言各的 |
+
+- **stub 确定性**（v5.0 §8.2）：同输入重复调用 N 次结论全同；返回带 `stub=true` 标记；**测试里显式断言非随机**（两次调用结果 equals）。
+- **completeness 如实**：S13（部分缺分钟）断言 `Judged{completeness}` 按实际缺失比例上报，不吞信息。
+- **门控/免考端到端**（联调，非单测）：测试库 `yc_point_map` 置 `gate_enabled=1`（种子 3009），跑通"门控前置过滤 → judge → yx501 后置应用"三阶段全链（v5.0 §14-7：合成库点位已齐）。
+
+### 4.3 D3 · 时间对齐工具（L0）
+
+- 纯函数单测边界：`29.999s` 舍 / `30.000s` 进 / `30.5s` 进 / 跨分钟 / 跨小时 / 跨天；**禁 floor/截断/按原始秒分组**（v5.0 §13）。
+- **取整幂等**（v5.0 §5 时间契约）：已整到分钟的值再取整不变——单测一条断言覆盖（双重取整无害的依据）。
+- 复用 **S18**（:29 舍）/ **S19**（:30 进）现成期望，不另造。
+
+### 4.4 D4 · 格式校验三步闸门（L0）
+
+- 三步各自独立断言：① 放宽边界粗筛（边界分钟不丢行）；② 正则校验（`yyyy-MM-dd HH:mm:ss.SSS`，反例逐一拦截 + 记日志）；③ 解析后精确过滤（粗筛多读的行被剔除、目标区间外的行被剔除）。
+- 正例零误杀：26 场景全量过闸门，条数与 manifest 核对无异常丢弃。
+
+### 4.5 D2 · 管理表 DDL + 逻辑 FK（L1，目标 `ry_vqms_test` @ MySQL 8.4）
+
+- DDL 初始化成功 + 种子可查（六表：`busbar`/`busbar_group`/`yc_point_map`/`busbar_threshold`/`vqms_judge_param`/`vqms_command_ledger`）。
+- **逻辑 FK 拒绝路径逐条单测**（v5.0 §6.2）：`busbar.group_num` 指向不存在组 → 拒；`busbar_group.main_indicator_yc_num`（非空）指向不存在点 → 拒；`busbar_threshold.busbar_num` 不存在 → 拒；删除被引用的 `busbar_group` → 拒。**注意 `vqms_command_ledger.obj_num` 不参与本校验**（现场整定、非管理表引用）。
+- `busbar_threshold` 生效区间：新增阈值自动闭合旧区间 `effective_to`（同事务），区间不重叠断言。
+
+### 4.6 D5 / D7 · RuoYi 脚手架 + 判定参数 CRUD（L1/L3）
+
+- D5：菜单/权限/perms 生效（`vqms:judgeparam:list` 等全小写，v5.0 §10.1）；7 页空壳 CRUD 前端调通后端。
+- D7：`/vqms/judgeParam` CRUD 可用；**值域校验拒绝**——`t_fast`∉[1,5)（如 0/5/6）、`t_fast ≥ t_econ`、锁定行（`t_econ`/分档阈值）修改；**缓存即时生效**——改值后下一次判定读取即新值（`CacheEvict` 断言：改 `t_fast` 前后两次 `judge` 调用读到不同参数）。
+
+### 4.7 D8 · 指令流水账 `vqms_command_ledger`（L1）
+
+v5.0 §12.1 D8 完成标准逐条落测（DDL 依据见 v5.0 §6.2.6）：
+
+- **uk 幂等**：同一批 26 场景指令**重复抓取两遍**，行数不变（`uk_cmd` 冲突跳过）。
+- **全量入账**：`vqms_avc_test` 中全部 `warn_type=5` 指令入账，`warn_time`/`millisecond`/`obj_num`/`warn_content` 与外部源原文逐字段一致（**原文摘录，不做任何解码**）。
+- **无判定结论列**：实体/DDL 断言不存在判定/解码结果字段（存储切分铁律的例外边界——只记原始事实）。
+- **`obj_num` NULL 兜底**：构造 `obj_num=NULL` 的指令（MySQL 唯一键视 NULL 互不相同，uk 不拦截），断言应用层去重生效、不产生重复行。
+
+### 4.8 D9 · 类型化失败契约 + 参数化策略骨架（L0，v5.0 新增）
+
+- **类型契约**：`RegulationOutcome` sealed（`Judged{fast, econ, completeness}` / `Undecodable{reason}`）；原因分类枚举三类（v5.0 §8.2：`循环码非法`/`缺t₀电压`/`编码脏写`）——**合成场景只覆盖两类**：S11=缺t₀电压、S12=编码脏写；`循环码非法` **须测试代码自造输入构造**（如 `9X02`，语义本身待生产数据验证，v5.0 §8.5/§14-9）。
+- **策略参数表 DDL 归属**：策略参数表（`param_value` varchar，仿 `vqms_judge_param`）不在现有 `sql/vqms.sql` 六表内——DDL 细节随 D9 定稿落地（v5.0 §8.7），本方案 §3 的 `ry_vqms_test` 用途已含 D9。
+- **策略评估纯函数 = 参数化测试的主场**：甲/乙/丙/丁四套候选（`docs/数据不可用处理策略.md` §3/§4）**不是四套代码，是同一纯函数的四组配置**——直接把四套候选当四组测试向量：同一份输入（completeness / Undecodable 归因），四组配置各自断言预期行为（宽松跳过 / 50% 阈值剔除+计数 / 计不合格 / 标记挂起）。这是对 v5.0 §8.7「换策略 = 改配置、代码不动」的直接验证。
+- **改配置行为即变**：运行时改策略参数表值（不重编译、不换 Bean），纯函数输出随之变化——集成级一条断言。
+- **选套值留空**（Leo 2026-08-18 拍板）：断言策略参数表**不预设处置值**（空表/无处置行）——测试里甲乙丙丁是**测试注入的参数**，不是种子数据。
+- **留痕事件（v5.0 修订项 P5，建议）**：若落 `ApplicationEvent`，断言 `Undecodable` 归因与窗口完整度事件被独立监听器收到（计数/告警与主逻辑物理隔离）。
+
+### 4.9 D6 · 前端阶段 1–3（L3）
+
+- 数据全程走 `/vqms/*`（**无 mock**：检查仓库无 mock 数据文件、dev 代理指向真实后端）；电压等级筛选/级联可用（curve/daily/monthly/yearly/threshold 5 页，avc-runtime/avc-regulation 无此筛选项——反向断言）。
+- 组件测试（Vitest + `@vue/test-utils`）与 Playwright 关键路径（登录→选母线→曲线→日/月/年报表）为**可选增强**，不阻塞 D6 完成标准；人工冒烟清单先行。
+
+## 5. 搁置轨（S1–S5）测试策略
+
+| # | 测试策略 |
+|---|---|
+| S1 判定实现 | 契约先行（§4.2）：Stub 档验契约形状先跑，循环码定稿后换 `DefaultRegulationJudge` 同批断言按映射表全量生效——**准入门槛 = 19 个调节场景全量通过** |
+| S2/S3 统计落库 DDL | DDL 定稿前**不写**落库集成测试（v5.0 唯一禁忌：没定 DDL 别硬写统计表） |
+| S4 Quartz 编排 | 同上，编排定稿后补 |
+| S5 策略定稿与应用 | **分轨**（v5.0 §8.7）：骨架/参数表/纯函数测试属 D9 现在就跑（§4.8）；**定稿**（政策拍板+写入配置）只改数据不改测试；**应用**（真实分母记账）随统计上线补端到端断言 |
+
+## 6. ⚠️ 前置差距（开工 D9 / S1 契约测试前必须收口）
+
+> 这是本次盘点新发现的问题，**阻塞 manifest 作为 oracle 的有效性**：
+
+1. **`thresholds.yaml` 是拍板前旧值**：`t_fast_min: 5`、`t_econ_min: 30`（注释还写着"Leo 定 30min"）——与 Leo 2026-08-14 定案（`t_fast`∈[1,5) 整数默认建议 4、`t_econ`=**5 写死**、指令 5 分钟间隔 → 窗口 5 分钟两档不重叠，v5.0 §6.2.5/§8.4）**直接冲突**。S01–S19 的窗口数据排布与 manifest 期望按旧窗口 [1,5]+[6,30] 计算，在新参数下**期望结论可能不成立**。
+   **动作**：对齐 `thresholds.yaml` → 重算/重排 S 系列场景数据 → 重新生成 manifest → 抽查 S01/S02/S05 人工核对。**此项完成前，manifest 只能当"三态时代快照"参考，不得当 D9 断言 oracle。**
+2. **manifest 三态期望遗留**：`EXEMPT`/`SKIP` 按 §4.2 映射表消费（不改 manifest 本体，映射写在测试代码里并注明来源行）。
+3. U 系列（U01–U07）按 v5.0 §8.3 已定点位（511/512 并网、521/522 退出原因）核对生成器输出——README 场景表已按此口径，重算时一并复核。
+4. **`循环码非法` 分支零场景覆盖**：S12 只构造了编码脏写（`",abc."` 脏文本）一种失败，`循环码非法` 在 26 场景中没有任何数据——该类的 D9 构造用例**只能测试代码自造输入**（语义本身待生产数据，v5.0 §14-9）；顺带在 D9 定稿时明确 S16（`L>H` 无效窗）的契约承载（并入 `Undecodable` 原因扩展或独立无效信号）。
+
+## 7. 工具链
+
+| 层 | 工具 |
+|---|---|
+| Java 单元 | JUnit 5 + Mockito + AssertJ（无 Spring 上下文，毫秒级） |
+| Java 集成 | Spring Boot Test，**连接 profile 指向 10.0.0.9 直连**（§3 矩阵），无 Testcontainers |
+| Python（avc-data-gen） | 既有 pytest（`tests/test_l0_units.py`，仅取整/解码/jitter 单测）；manifest 一致性校验为**阶段 0 待建项**（§8，26 场景 SQL 与 manifest 同步，场景增删不漏更新） |
+| 前端 | Vitest + `@vue/test-utils`（可选）、Playwright（可选）；人工冒烟清单为主 |
+| CI | 暂无；将来上 CI 可恢复容器方案，测试代码不变只换 profile |
+
+## 8. 里程碑（对齐 v5.0 §12，D1 目标 2026-08-23 前启动）
+
+| 阶段 | 交付 | 测试铺开 |
+|---|---|---|
+| 0 | §6 前置差距收口（生成器对齐 + manifest 重算 + 循环码非法/S16 契约出口明确） | L0（Python：对齐后的一致性校验，待建） |
+| 1 | D1 source 层 + D3 时间工具 + D4 闸门 | L0 全量 + L1（直连 `vqms_avc_test`）+ L4 交叉比对 |
+| 2 | D2 管理表 + D5 脚手架 + D7 判定参数 | L1（`ry_vqms_test`：DDL/逻辑FK/值域/缓存）+ L3（D5 七页空壳前端冒烟） |
+| 3 | D8 流水账 | L1（幂等/全量/无结论列/NULL 兜底） |
+| 4 | D9 契约+策略骨架 | L0（纯函数四套候选参数化 + 循环码非法自造用例）+ L1（策略参数表 DDL + 集成断言）+ L2（Stub 档契约形状，前置差距已收口） |
+| 5 | D6 前端接真实数据 | L3 人工冒烟（自动化可选） |
+| 6 | S1 循环码定稿 | L2 换 Bean 跑真实现，19 个调节场景全量为准入 |
+| 7 | S5 应用 / S2–S4 统计管线 | 落库/编排集成测试 + 端到端 |
+
+## 9. 风险与对策
+
+| 风险 | 对策 |
+|---|---|
+| **生成器参数漂移**（§6-1，最高优先） | 开工 D9 前收口；manifest 一致性 pytest 常驻，`thresholds.yaml` 与场景期望联动校验 |
+| manifest 三态期望 vs v5.0 两态契约 | §4.2 映射表集中在测试代码一处，注明 v5.0 §12.2 S1 出处；manifest 本体不改 |
+| 10.0.0.9 不可用则集成测试全停 | L0 纯函数测试不依赖网络，占比最大化；集成测试标注 `@Tag("integration")` 可单独跳过；将来 CI 恢复容器方案双轨 |
+| 共享测试库被污染 | `vqms_avc_test` 只读纪律 + `ry_vqms_test` 每轮重置种子脚本（随 D2 落地） |
+| 算法反复推翻测试 | 契约先行只换 Bean；策略类测试=纯函数参数化，改配置不改测试 |
+| 凭据泄漏 | 全部走环境变量；SELECT-only 账号连真实库；不在测试代码/日志输出密码 |

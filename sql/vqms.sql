@@ -133,11 +133,13 @@ create table yc_point_map (
 -- 原 3008 为早期探查遗留、合成库不存在，真实现场点号到位后改。
 -- 3009（AVC投退）gate_enabled=0 保守默认：防全新部署真实环境误用合成点号开门控；
 -- 合成库联调开门控时在测试环境手动置 1（4001 主母线号指示点无门控语义，不受影响）。
+-- 2003（远方就地总）2026-08-18 定号：对端配置库现成派生点 yx2003 = OR(yx12 正母, yx23 副母)，
+-- 1=远方/0=就地；warn_info 有 obj_num=2003「远方就地总合/分」事件佐证（docs/外部DB/JS计算引擎说明.md）。
+-- gate_enabled=0 保守同 3009：真实现场部署核对后置 1；合成库联调时测试环境手动置 1。
 insert into yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
   (4001, '主母线号', 'busbar_id', null, null, 0),
-  (3009, 'AVC投退', 'yx', '投入', '退出', 0);
--- ⚠️ 待现场补录：远方就地总 yx 门控点 yc_num，确认后插入并置 gate_enabled=1：
--- (<yc_num>, '远方就地总', 'yx', '远方', '就地', 1);
+  (3009, 'AVC投退', 'yx', '投入', '退出', 0),
+  (2003, '远方就地总', 'yx', '远方', '就地', 0);
 
 
 -- 5、判定整定参数（§6.2.5，v4.1 新增；RuoYi 代码生成 CRUD → /vqms/judgeParam + Redis 缓存 vqms:judgeParam:{key}）

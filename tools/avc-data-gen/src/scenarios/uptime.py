@@ -41,6 +41,9 @@ def _build_uptime_yc(cfg, base_date, *, grid_main_fn, grid_aux_fn,
     for (m, v) in onoff_changes:
         t = at_minute(base_date, hour=m // 60, minute=m % 60)
         pts.append(YcPoint(yc_num=p["avc_onoff"], t=t, value=float(v)))
+    # 远方就地总 yx2003（阶跃保持：场景默认全天远方=1，保证联调置 gate_enabled=1 后门控可端到端跑）
+    pts.append(YcPoint(yc_num=p["remote_local"],
+                       t=at_minute(base_date, hour=0, minute=0), value=1.0))
     # 退出原因 yc521/522（变位点写）
     for (m, v) in exit_main_changes:
         t = at_minute(base_date, hour=m // 60, minute=m % 60)

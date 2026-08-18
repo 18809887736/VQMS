@@ -1,8 +1,10 @@
 # VQMS AVC 合成数据生成器配置 —— 遥测点号映射
-# 所有 yc_num 均为"现场整定"，真实点号未公开。以下为占位号，现场补录后改本文件即可。
+# 除 2003（真实派生点，2026-08-18 定号）外，其余 yc_num 均为"现场整定"占位号，现场补录后改本文件即可。
 # 固定的 JS 引擎派生点（yc511/512/521/522、yx501）按数据源头（草稿）.md 缺口定义。
 
 avc_onoff: 3009            # AVC 投退点（yc_data 1=投 / 0=退，阶跃保持）
+remote_local: 2003         # 远方就地总（真实派生点 yx2003 = OR(yx12 正母, yx23 副母)，1=远方/0=就地；
+                           # 取自对端配置库 JS_DATA 14「远方/就地合并」+ warn_info obj_num=2003 佐证）
 main_busbar_num: 4001      # 主母线号指示点（yc_data 0/1）
 realtime_v_busbar0: 4002   # 实时母线电压 busbar0（yc_data kV 带小数，如 234.25）
 realtime_v_busbar1: 4003   # 实时母线电压 busbar1

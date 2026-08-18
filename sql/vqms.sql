@@ -131,6 +131,11 @@ create table yc_point_map (
 
 -- 初始数据：点号对齐合成库 points.yaml 体系（tools/avc-data-gen/config/points.yaml）；
 -- 原 3008 为早期探查遗留、合成库不存在，真实现场点号到位后改。
+-- 真实号考据（2026-08-18，证据链见 docs/数据源头（草稿）.md 定号一览，落地前现场核对）：
+--   主母线号 = yc3（对端 BUSBAR_GROUP.MainBarYcNum=3）；实时电压 = yc8 东母 / yc14 西母（BUSBAR.realVYcNum）；
+--   总有功 = yc216 + yc316（GENERATOR.pYcNum，VQMS 求和）；AVC投退 = 候选 yx1001（AVC_INFO.AVCStatusYxNum）。
+-- ⚠️ 撞号警示：合成占位 3009 在真实库 = 四号机组下闭锁总信号（JS_DATA js109），语义不同——
+--   真实现场核对后必须换号，勿把 3009 配到真实环境当 AVC投退。
 -- 3009（AVC投退）gate_enabled=0 保守默认：防全新部署真实环境误用合成点号开门控；
 -- 合成库联调开门控时在测试环境手动置 1（4001 主母线号指示点无门控语义，不受影响）。
 -- 2003（远方就地总）2026-08-18 定号：对端配置库现成派生点 yx2003 = OR(yx12 正母, yx23 副母)，

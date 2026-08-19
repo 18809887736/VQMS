@@ -135,7 +135,7 @@ v5.0 契约是两态 + Undecodable，manifest 是三态时代产物，**期望�
 ### 4.6 D5 / D7 · RuoYi 脚手架 + 判定参数 CRUD（L1/L3）
 
 - D5：菜单/权限/perms 生效（`vqms:judgeparam:list` 等全小写，v5.0 §10.1）；7 页空壳 CRUD 前端调通后端。
-- D7：`/vqms/judgeParam` CRUD 可用；**值域校验拒绝**——`t_fast`∉[1,5)（如 0/5/6）、`t_fast ≥ t_econ`、锁定行（`t_econ`/分档阈值）修改；**缓存即时生效**——改值后下一次判定读取即新值（`CacheEvict` 断言：改 `t_fast` 前后两次 `judge` 调用读到不同参数）。
+- D7：`/vqms/judgeParam` CRUD 可用；**值域校验拒绝**——`t_fast`∉[1,5)（如 0/5/6）、`t_fast ≥ t_econ`、锁定行（`t_econ`/分档阈值）修改；**缓存即时生效**——改值后下一次判定读取即新值（`CacheEvict` 断言：改 `t_fast` 前后两次 `judge` 调用读到不同参数）。**值域校验分层候选（2026-08-19 评审吸收，D7 起草时定；原则见 §2.1「约束优先于测试逻辑」）**：可下沉 MySQL 8.4 CHECK——① 行本地 `param_value BETWEEN value_min AND value_max`；② 锁定行固定值（`param_key='t_econ' ⇒ param_value=5`，改 6 即违反）。跨行的 `t_fast < t_econ` **不能直接 CHECK**（CHECK 行本地），但由 ①+② 传导等价保证（t_econ 钉 5 ∧ t_fast∈[1,4]）。Service 层保留友好报错（CHECK 报错生硬）；直改 DB / 旁路写入被结构性拦。测试断言两段：Service 层拒绝（友好错误）+ 绕过 Service 直改 DB 被 CHECK 拒。
 
 ### 4.7 D8 · 指令流水账 `vqms_command_ledger`（L1）
 

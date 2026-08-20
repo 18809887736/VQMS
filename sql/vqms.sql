@@ -6,7 +6,7 @@
 --
 -- ⚠️⚠️ 破坏性脚本，严禁对已有数据的环境重复执行 ⚠️⚠️
 --   每张表开头都是 DROP TABLE IF EXISTS——重跑会清空重建：
---   busbar / busbar_group / busbar_threshold / yc_point_map / vqms_judge_param 等人工维护的配置表
+--   vqms_busbar / vqms_busbar_group / vqms_busbar_threshold / vqms_yc_point_map / vqms_judge_param 等人工维护的配置表
 --   会回到初始种子数据，现场已录入的母线（如 500kV）、调整过的容差/整定参数、补录的点位全部丢失
 --   （vqms_command_ledger 为只增流水账，重跑会清空——可从外部源重抓，无人工数据损失）。
 --   仅限全新部署首启执行；线上变更表结构请用 ALTER 或增量迁移脚本，勿整脚本重跑。
@@ -17,10 +17,10 @@
 --   （vqms_menu.sql 最后跑，须在 ry 建好 sys_menu 后；vqms.sql 末尾 UPDATE 覆盖 ry 默认值）
 --
 -- 表结构权威来源：项目规划_v5_0.md（管理表 DDL 一律以 §6.2 为准；v4.1 已并入 v5.0）
---   §6.2.1 busbar            主母线元数据
---   §6.2.2 busbar_group      母线组（主母线判定单元）
---   §6.2.3 yc_point_map      yc_history 遥测点语义映射
---   §6.2.4 busbar_threshold  阈值（带生效区间；tolerance_v 占位/角色待定）
+--   §6.2.1 vqms_busbar            主母线元数据
+--   §6.2.2 vqms_busbar_group      母线组（主母线判定单元）
+--   §6.2.3 vqms_yc_point_map      yc_history 遥测点语义映射
+--   §6.2.4 vqms_busbar_threshold  阈值（带生效区间；tolerance_v 占位/角色待定）
 --   §6.2.5 vqms_judge_param  判定整定参数（t_fast / t_econ / 分档阈值）
 --   §6.2.6 vqms_command_ledger  AVC 指令流水账（原始事实只增表，确定轨 D8）
 --   字典 vqms_v_grade → 本脚本第六节
@@ -32,7 +32,7 @@
 --     判定已改指令级口径（AVC考核核心算法_草稿v5_0 §2），分钟级表不能复用（v5.0 §6.3）；
 --     统计表随搁置轨（§12.2 S2/S3/S4）解封后另出 DDL，勿从 v3.x 版本恢复旧表
 --   * 新增 vqms_judge_param 判定整定参数表（确定轨 D7）
---   * busbar.v_grade 注释补 2=66kV及以下(预留)，与字典 vqms_v_grade 对齐
+--   * vqms_busbar.v_grade 注释补 2=66kV及以下(预留)，与字典 vqms_v_grade 对齐
 --   * 保留 2026-08-15 第六节 vqms_v_grade 字典，节号不动
 --   * 新增 vqms_command_ledger 指令流水账（Leo 拍板：搁置期计数契约的
 --     落库目标，存储切分铁律唯一有界例外，见 v4.1 §4/§6.2.6）
@@ -44,12 +44,12 @@
 -- ============================================================
 
 -- 1、母线组 — 主母线判定单元（§6.2.2）
---    命名消歧：本表是 VQMS 自建 busbar_group，与外部库 QHeatAvcRtdb.BUSBAR_GROUP（大写、废表不读）只是同名、毫无关系
-drop table if exists busbar_group;
-create table busbar_group (
+--    命名消歧：本表是 VQMS 自建 vqms_busbar_group，与外部库 QHeatAvcRtdb.BUSBAR_GROUP（大写、废表不读）只是同名、毫无关系
+drop table if exists vqms_busbar_group;
+create table vqms_busbar_group (
   group_num               bigint(20)   not null                comment '母线组编号',
   group_name              varchar(64)  not null                comment '组名',
-  v_grade                 tinyint      not null                comment '电压等级编码，同 busbar.v_grade',
+  v_grade                 tinyint      not null                comment '电压等级编码，同 vqms_busbar.v_grade',
   main_indicator_yc_num   bigint(20)   default null            comment '该组"当前主母线号"指示点，对齐 yc_history.yc_num；未接入前为空',
   default_main_busbar_num bigint(20)   default null            comment '指示点不可用时的兜底主母线号；NULL=不兜底→该组该分钟无主母线',
   max_staleness_minutes   int          not null default 30     comment '指示点陈旧窗口(分钟)',
@@ -62,18 +62,18 @@ create table busbar_group (
 -- 初始数据：220kV 组已知；500kV 组占位待补，指示点号现场补录前该组不参与统计
 -- 主母线号指示点 4001 = 合成库 points.yaml 体系（tools/avc-data-gen/config/points.yaml）；
 -- 原 3008 为早期探查遗留、合成库不存在。真实现场点号到位后改（Leo 2026-08-17 拍板对齐）。
-insert into busbar_group (group_num, group_name, v_grade, main_indicator_yc_num, default_main_busbar_num, max_staleness_minutes) values
+insert into vqms_busbar_group (group_num, group_name, v_grade, main_indicator_yc_num, default_main_busbar_num, max_staleness_minutes) values
   (0, '220kV母线组', 1, 4001, 0, 30),
   (1, '500kV母线组', 0, null, null, 30);
 
 
 -- 2、主母线元数据（§6.2.1）
-drop table if exists busbar;
-create table busbar (
+drop table if exists vqms_busbar;
+create table vqms_busbar (
   busbar_num    bigint(20)    not null                comment '主母线编号，对齐 his_curve_sv.busbar_num',
   busbar_name   varchar(64)   not null                comment '母线名称，如 220kV 正母线',
   v_grade       tinyint       not null                comment '电压等级编码：0=500kV, 1=220kV, 2=66kV及以下(预留)，与字典 vqms_v_grade 严格对齐勿改',
-  group_num     bigint(20)    default null            comment '所属母线组（逻辑FK → busbar_group.group_num）',
+  group_num     bigint(20)    default null            comment '所属母线组（逻辑FK → vqms_busbar_group.group_num）',
   nominal_kv    decimal(10,3) not null                comment '标称电压 kV（220.000 / 500.000）',
   status        char(1)       not null default '0'    comment '状态：0=正常, 1=停用',
   create_by     varchar(64)   default ''              comment '创建者',
@@ -86,7 +86,7 @@ create table busbar (
 
 -- 初始数据（220kV 东/西母线——对齐外部 BUSBAR 注册表样本（docs/外部DB/外部数据源.md）；
 --   warn_info 告警/状态文本对同一对母线称「正母线/副母线」，两套称呼矛盾，最终以现场确认为准；500kV 待现场补录）
-insert into busbar (busbar_num, busbar_name, v_grade, group_num, nominal_kv) values
+insert into vqms_busbar (busbar_num, busbar_name, v_grade, group_num, nominal_kv) values
   (0, '220kV 东母线', 1, 0, 220.000),
   (1, '220kV 西母线', 1, 0, 220.000);
 
@@ -94,10 +94,10 @@ insert into busbar (busbar_num, busbar_name, v_grade, group_num, nominal_kv) val
 -- 3、阈值（带生效区间，变更不回溯重算，§6.2.4）
 --    ⚠️ tolerance_v 占位/角色待定：判定已改指令级包络（v4.1 §8），本列不再作判定核心；
 --    表结构先建，数值与角色待算法定稿时重新定位
-drop table if exists busbar_threshold;
-create table busbar_threshold (
+drop table if exists vqms_busbar_threshold;
+create table vqms_busbar_threshold (
   threshold_id           bigint(20)    not null auto_increment comment '主键',
-  busbar_num             bigint(20)    not null                comment '母线编号（逻辑 FK → busbar.busbar_num）',
+  busbar_num             bigint(20)    not null                comment '母线编号（逻辑 FK → vqms_busbar.busbar_num）',
   criterion_type         varchar(8)    not null default 'AVC'  comment '口径：AVC=控制达标率 / GB=国标±10%',
   tolerance_v            decimal(10,3) default null            comment 'AVC 容差(kV)：220kV=1.000, 500kV=1.500；GB 口径为空。⚠️占位/角色待定，禁用旧 |average_SV−plan_SV|≤tolerance_v 口径',
   plan_sv_invalid_policy varchar(20)   not null default 'SKIP' comment 'plan_SV 废值策略：SKIP/COUNT_UNQUALIFIED/FALLBACK。⚠️旧 plan_SV 模型遗留列：plan_SV 已废值不读、暂无消费方，角色随 tolerance_v 一并待算法定稿重定',
@@ -113,14 +113,14 @@ create table busbar_threshold (
 ) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 母线电压合格阈值（带生效区间）';
 
 -- 初始数据（AVC 口径，容差按 v4.1 §7.1 权威值：220kV=1.000 kV）
-insert into busbar_threshold (busbar_num, criterion_type, tolerance_v, effective_from) values
+insert into vqms_busbar_threshold (busbar_num, criterion_type, tolerance_v, effective_from) values
   (0, 'AVC', 1.000, '2026-01-01'),
   (1, 'AVC', 1.000, '2026-01-01');
 
 
 -- 4、yc_history 遥测点语义映射（§6.2.3）
-drop table if exists yc_point_map;
-create table yc_point_map (
+drop table if exists vqms_yc_point_map;
+create table vqms_yc_point_map (
   yc_num         bigint(20)    not null                comment '遥测点编码，对齐 yc_history.yc_num',
   point_name     varchar(64)   not null                comment '语义名称，如 主母线号',
   point_type     varchar(32)   default null            comment 'busbar_id=主母线号 / voltage=电压模拟量 / yx=开关量(配 state_1/0_label)',
@@ -146,7 +146,7 @@ create table yc_point_map (
 -- 2003（远方就地总）2026-08-18 定号：对端配置库现成派生点 yx2003 = OR(yx12 正母, yx23 副母)，
 -- 1=远方/0=就地；warn_info 有 obj_num=2003「远方就地总合/分」事件佐证（docs/外部DB/JS计算引擎说明.md）。
 -- gate_enabled=0 保守同 3009：真实现场部署核对后置 1；合成库联调时测试环境手动置 1。
-insert into yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
+insert into vqms_yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
   (4001, '主母线号', 'busbar_id', null, null, 0),
   (3009, 'AVC投退', 'yx', '投入', '退出', 0),
   (2003, '远方就地总', 'yx', '远方', '就地', 0);
@@ -223,14 +223,14 @@ UPDATE sys_config SET config_value = 'false' WHERE config_key = 'sys.account.cap
 
 -- ============================================================
 -- 六、VQMS 字典（2026-08-15 修订待办 A8：电压等级维度定位）
---   vqms_v_grade：编码与 busbar.v_grade / busbar_group.v_grade 严格对齐（0=500kV,1=220kV），勿改值
---   2=66kV及以下为预留档：本站暂无该等级母线，现场出现时录入 busbar 行即可启用，模型/字典结构不变
+--   vqms_v_grade：编码与 vqms_busbar.v_grade / vqms_busbar_group.v_grade 严格对齐（0=500kV,1=220kV），勿改值
+--   2=66kV及以下为预留档：本站暂无该等级母线，现场出现时录入 vqms_busbar 行即可启用，模型/字典结构不变
 --   delete+insert 按 dict_type 幂等，可重复执行；dict_id/dict_code 走自增不写死
 -- ============================================================
 delete from sys_dict_data where dict_type = 'vqms_v_grade';
 delete from sys_dict_type where dict_type = 'vqms_v_grade';
 insert into sys_dict_type (dict_name, dict_type, status, create_by, create_time, remark)
-values ('电压等级', 'vqms_v_grade', '0', 'admin', sysdate(), 'VQMS 电压等级（编码对齐 busbar.v_grade：0=500kV,1=220kV,2=66kV及以下预留）');
+values ('电压等级', 'vqms_v_grade', '0', 'admin', sysdate(), 'VQMS 电压等级（编码对齐 vqms_busbar.v_grade：0=500kV,1=220kV,2=66kV及以下预留）');
 insert into sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, remark)
 values (1, '500kV',      '0', 'vqms_v_grade', '', 'danger',  'N', '0', 'admin', sysdate(), ''),
        (2, '220kV',      '1', 'vqms_v_grade', '', 'primary', 'N', '0', 'admin', sysdate(), ''),

@@ -31,19 +31,19 @@
 
 ## 二、Quartz 调度表（quartz.sql，11 张，大写）
 
-| 表名 | 用途 |
-|---|---|
-| `QRTZ_JOB_DETAILS` | 任务详情 |
-| `QRTZ_TRIGGERS` | 触发器 |
-| `QRTZ_SIMPLE_TRIGGERS` | 简单触发器 |
-| `QRTZ_CRON_TRIGGERS` | Cron 触发器 |
-| `QRTZ_SIMPROP_TRIGGERS` | 复合属性触发器 |
-| `QRTZ_BLOB_TRIGGERS` | Blob 触发器 |
-| `QRTZ_FIRED_TRIGGERS` | 已触发触发器 |
-| `QRTZ_PAUSED_TRIGGER_GRPS` | 暂停的触发器组 |
-| `QRTZ_SCHEDULER_STATE` | 调度器状态 |
-| `QRTZ_LOCKS` | 锁表 |
-| `QRTZ_CALENDARS` | 日历 |
+| 序号 | 表名 | 用途 |
+|---|---|---|
+| 1 | `QRTZ_JOB_DETAILS` | 任务详情 |
+| 2 | `QRTZ_TRIGGERS` | 触发器 |
+| 3 | `QRTZ_SIMPLE_TRIGGERS` | 简单触发器 |
+| 4 | `QRTZ_CRON_TRIGGERS` | Cron 触发器 |
+| 5 | `QRTZ_SIMPROP_TRIGGERS` | 复合属性触发器 |
+| 6 | `QRTZ_BLOB_TRIGGERS` | Blob 触发器 |
+| 7 | `QRTZ_FIRED_TRIGGERS` | 已触发触发器 |
+| 8 | `QRTZ_PAUSED_TRIGGER_GRPS` | 暂停的触发器组 |
+| 9 | `QRTZ_SCHEDULER_STATE` | 调度器状态 |
+| 10 | `QRTZ_LOCKS` | 锁表 |
+| 11 | `QRTZ_CALENDARS` | 日历 |
 
 ## 三、与 VQMS 自建表的关系
 

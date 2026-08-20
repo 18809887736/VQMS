@@ -1,5 +1,8 @@
 -- ============================================================
--- VQMS 电压质量监测系统 - 建表脚本（v4.1 对齐版，2026-08-17）
+-- VQMS 电压质量监测系统 - 建表脚本（v5.0 对齐版，2026-08-20）
+--
+-- 注：v4.1 内容已并入 项目规划 v5.0（2026-08-18），判定口径并入 AVC考核核心算法_草稿v5_0。
+--   本脚本管理表 DDL 以 v5.0 §6.2 为准，判定口径以 草稿v5_0 §2 为准（v4.1 仅为历史合入记录）。
 --
 -- ⚠️⚠️ 破坏性脚本，严禁对已有数据的环境重复执行 ⚠️⚠️
 --   每张表开头都是 DROP TABLE IF EXISTS——重跑会清空重建：
@@ -9,9 +12,11 @@
 --   仅限全新部署首启执行；线上变更表结构请用 ALTER 或增量迁移脚本，勿整脚本重跑。
 --
 -- 与 RuoYi sys_* 表同库；库名由 docker MYSQL_DATABASE 决定，本脚本不含 CREATE DATABASE/USE
--- 首启执行顺序：00-create-app-user.sh → quartz.sql → ry_*.sql → vqms.sql（末尾 UPDATE 覆盖 ry 默认值）
+-- 首启执行顺序（docker-entrypoint-initdb.d 按文件名）：
+--   00-create-app-user.sh → quartz.sql → ry_20260417.sql → vqms.sql → vqms_menu.sql
+--   （vqms_menu.sql 最后跑，须在 ry 建好 sys_menu 后；vqms.sql 末尾 UPDATE 覆盖 ry 默认值）
 --
--- 表结构权威来源：项目规划_v4_1.md（管理表 DDL 一律以 §6.2 为准）
+-- 表结构权威来源：项目规划_v5_0.md（管理表 DDL 一律以 §6.2 为准；v4.1 已并入 v5.0）
 --   §6.2.1 busbar            主母线元数据
 --   §6.2.2 busbar_group      母线组（主母线判定单元）
 --   §6.2.3 yc_point_map      yc_history 遥测点语义映射
@@ -20,16 +25,16 @@
 --   §6.2.6 vqms_command_ledger  AVC 指令流水账（原始事实只增表，确定轨 D8）
 --   字典 vqms_v_grade → 本脚本第六节
 --
--- v4.1 对齐变更（2026-08-17，相对 v3.2 版本）：
+-- 历史变更（相对 v3.2，v4.1 起并入 v5.0）：
 --   * tolerance_v：int 伏特旧口径（220kV=300 / 500kV=500）→ decimal(10,3) kV 权威值 1.000 / 1.500
---     （v4.1 §6.2.4 / §7.1；旧口径 v3.2 起文档层已作废，本次物理 DDL 跟上）
+--     （v5.0 §6.2.4 / §7.1；旧口径 v3.2 起文档层已作废，物理 DDL 跟上）
 --   * 删除 v3.x 分钟级统计表 voltage_quality_daily/monthly/yearly、组级空档审计、precompute_cursor：
---     判定已改指令级口径（AVC考核核心算法_草稿4_1 §2），分钟级表不能复用（v4.1 §6.3）；
+--     判定已改指令级口径（AVC考核核心算法_草稿v5_0 §2），分钟级表不能复用（v5.0 §6.3）；
 --     统计表随搁置轨（§12.2 S2/S3/S4）解封后另出 DDL，勿从 v3.x 版本恢复旧表
---   * 新增 vqms_judge_param 判定整定参数表（修订待办 A6 / 确定轨 D7）
+--   * 新增 vqms_judge_param 判定整定参数表（确定轨 D7）
 --   * busbar.v_grade 注释补 2=66kV及以下(预留)，与字典 vqms_v_grade 对齐
---   * 保留 2026-08-15 第六节 vqms_v_grade 字典（修订待办 A8），节号不动
---   * 2026-08-17 新增 vqms_command_ledger 指令流水账（Leo 拍板 review I1-b：搁置期计数契约的
+--   * 保留 2026-08-15 第六节 vqms_v_grade 字典，节号不动
+--   * 新增 vqms_command_ledger 指令流水账（Leo 拍板：搁置期计数契约的
 --     落库目标，存储切分铁律唯一有界例外，见 v4.1 §4/§6.2.6）
 -- ============================================================
 
@@ -200,7 +205,7 @@ create table vqms_command_ledger (
 -- ============================================================
 -- 原 v3.2 版本此处的 voltage_quality_daily / voltage_quality_monthly / voltage_quality_yearly、
 -- voltage_quality_group_daily（注释块）、precompute_cursor 已整体删除：
---   * 判定口径已改为指令级（AVC考核核心算法_草稿4_1 §2：分母=发令次数、两档平行），
+--   * 判定口径已改为指令级（AVC考核核心算法_草稿v5_0 §2：分母=发令次数、两档平行），
 --     分钟级 / average_SV / plan_SV 口径的统计表不能复用作调节合格率落库（v4.1 §6.3）；
 --   * 指令级统计表（指令明细 + 日/月/年 rollup）、投运率时间记账表、预计算游标
 --     属搁置轨 S2/S3/S4，待算法定稿后设计并另出 DDL——勿从 v3.x 版本恢复旧表。

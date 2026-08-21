@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.source.mapper.HisCurveSvMapper">
+
+    <resultMap type="com.ruoyi.vqms.source.model.HisCurveSv" id="HisCurveSvResult">
+        <result property="saveTime"   column="save_time"   />
+        <result property="busbarNum"  column="busbar_num"  />
+        <result property="highSV"     column="high_SV"     />
+        <result property="lowSV"      column="low_SV"      />
+    </resultMap>
+
+    <!-- 有意排除 average_SV / plan_SV（废值，v5.0 §8.1） -->
+
+    <sql id="fromClause">
+        from his_curve_sv
+    </sql>
+
+    <select id="selectByRangeAndBusbar" resultMap="HisCurveSvResult">
+        select save_time, busbar_num, high_SV, low_SV
+        from his_curve_sv
+        where save_time between #{startTime} and #{endTime}
+          and busbar_num = #{busbarNum}
+        order by save_time
+    </select>
+
+    <select id="selectByRange" resultMap="HisCurveSvResult">
+        select save_time, busbar_num, high_SV, low_SV
+        from his_curve_sv
+        where save_time between #{startTime} and #{endTime}
+        order by save_time
+    </select>
+
+</mapper>

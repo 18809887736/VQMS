@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.source.mapper.YcHistoryMapper">
+
+    <resultMap type="com.ruoyi.vqms.source.model.YcHistory" id="YcHistoryResult">
+        <result property="ycNum"  column="yc_num"  />
+        <result property="ycTime" column="yc_time" />
+        <result property="ycData" column="yc_data" />
+    </resultMap>
+
+    <select id="selectByRangeAndYc" resultMap="YcHistoryResult">
+        select yc_num, yc_time, yc_data
+        from yc_history
+        where yc_time between #{startTime} and #{endTime}
+          and yc_num = #{ycNum}
+        order by yc_time
+    </select>
+
+    <select id="selectByRange" resultMap="YcHistoryResult">
+        select yc_num, yc_time, yc_data
+        from yc_history
+        where yc_time between #{startTime} and #{endTime}
+        order by yc_time
+    </select>
+
+</mapper>

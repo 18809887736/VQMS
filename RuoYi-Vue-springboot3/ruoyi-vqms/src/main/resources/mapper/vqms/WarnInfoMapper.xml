@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.source.mapper.WarnInfoMapper">
+
+    <resultMap type="com.ruoyi.vqms.source.model.WarnInfo" id="WarnInfoResult">
+        <result property="warnTime"    column="warn_time"    />
+        <result property="millisecond"  column="millisecond"   />
+        <result property="warnType"    column="warn_type"    />
+        <result property="objNum"      column="obj_num"      />
+        <result property="warnContent"  column="warn_info"    />
+    </resultMap>
+
+    <select id="selectByRangeAndType" resultMap="WarnInfoResult">
+        select warn_time, millisecond, warn_type, obj_num, warn_info
+        from warn_info
+        where warn_time between #{startTime} and #{endTime}
+          and warn_type = #{warnType}
+        order by warn_time
+    </select>
+
+</mapper>

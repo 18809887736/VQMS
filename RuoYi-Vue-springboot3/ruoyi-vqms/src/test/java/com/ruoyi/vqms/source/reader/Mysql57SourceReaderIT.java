@@ -18,7 +18,7 @@ import com.ruoyi.vqms.source.model.YcHistory;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * D1 source 只读层集成测试：直连 10.0.0.9 合成库 vqms_avc_test，读通三表。
+ * D1 source 只读层集成测试：直连 10.0.0.9 真实库 qheatavchisdb，读通三表。
  *
  * <p>直接用手工 mybatis SqlSessionFactory 调 mapper，验证 SQL + 领域映射（不绕经 @DataSource(SLAVE) 路由——
  * 该路由是 RuoYi 既有机制、与本模块实现无关）。</p>
@@ -34,7 +34,7 @@ class Mysql57SourceReaderIT
     {
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        ds.setUrl("jdbc:mysql://10.0.0.9:3306/vqms_avc_test"
+        ds.setUrl("jdbc:mysql://10.0.0.9:3306/qheatavchisdb"
                 + "?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8");
         ds.setUsername(System.getenv().getOrDefault("VQMS_AVC_TEST_USER", "root"));
         ds.setPassword(System.getenv().getOrDefault("VQMS_AVC_TEST_PASSWORD", "syth7777"));

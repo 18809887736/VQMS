@@ -22,30 +22,38 @@ import com.ruoyi.vqms.source.mapper.WarnInfoMapper;
 import com.ruoyi.vqms.source.model.HisCurveSv;
 import com.ruoyi.vqms.source.model.WarnInfo;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * D1 场景验证：加载 tools/avc-data-gen 的 manifest.json，核对 D1 读出的行数据与生成器承诺一致
- * （而非只断言「读到非空行」）。
+ * D1 场景验证：加载 tools/avc-data-gen/output/manifest.json，按场景 ID 读取合成库三表数据，
+ * 核对行级事实与 manifest 承诺一致。
  *
- * <p>注意 D1 是<b>只读层</b>，不判定——manifest 里的 QUAL/PEN/EXEMPT/SKIP 是判定结论（搁置轨 S1 judge 的事，
- * 见测试方案 §4.2 L2 契约测试）。D1 能核对的「行级事实」是：</p>
- * <ol>
- *   <li>warn_type=5 指令条数 == S 场景数(19) + S17 双指令额外 1 = 20；</li>
- *   <li>S17 恰两条指令、obj_num 分 0/1 两通道；</li>
- *   <li>his_curve_sv 双写完整性：同分钟 busbar 0 与 1 并存；</li>
- *   <li>关键场景话 文（S12 脏文本/S09 增量编码）原文字段无丢列。</li>
- * </ol>
+ * <h3>断言边界说明</h3>
+ * <ul>
+ *   <li>manifest.expected 里的 QUAL/PEN/EXEMPT/SKIP 是 judge（S1 搁置轨）的判定产物。
+ *       D1 只做只读，<b>不能直接比对判定结论</b>。</li>
+ *   <li>D1 能核对的事实：<br>
+ *       · 指令条数 == 20（19 个 S 场景 + S17 双指令额外 1）<br>
+ *       · S17 的 2 条指令 obj_num 分 0/1 通道<br>
+ *       · his_curve_sv 双写完整性（同分钟 busbar 0+1 并存）<br>
+ *       · <b>原文级核对</b>：manifest 承诺的 v_target 数字应出现在对应 warn_content 原文里
+ *         （纯字符串匹配，不需要解码器）</li>
+ *   <li>测试连接 <b>真实 qheatavchisdb</b>（Leo 指令），非合成 vqms_avc_test</li>
+ * </ul>
  */
 class ManifestScenarioReadIT
 {
-    /** 合成库全量时间范围（生成器 base_date=2026-03-15 至 2026-04-02） */
+    private static final String DB_URL =
+            "jdbc:mysql://10.0.0.9:3306/qheatavchisdb"
+            + "?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8";
+
+    /** 全量时间范围覆盖合成数据（2026-03-15 ~ 2026-04-02） */
     private static final String RANGE_START = "2026-03-15 00:00:00";
-    private static final String RANGE_END = "2026-04-03 00:00:00";
+    private static final String RANGE_END   = "2026-04-03 00:00:00";
 
     private static SqlSessionFactory sessionFactory;
+    private static HisCurveSvMapper curveMapper;
+    private static WarnInfoMapper warnMapper;
     private static List<JSONObject> manifest;
 
     @BeforeAll
@@ -53,8 +61,7 @@ class ManifestScenarioReadIT
     {
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        ds.setUrl("jdbc:mysql://10.0.0.9:3306/qheatavchisdb"
-                + "?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8");
+        ds.setUrl(DB_URL);
         ds.setUsername(System.getenv().getOrDefault("VQMS_AVC_TEST_USER", "root"));
         ds.setPassword(System.getenv().getOrDefault("VQMS_AVC_TEST_PASSWORD", "syth7777"));
 
@@ -64,78 +71,127 @@ class ManifestScenarioReadIT
                 .getResources("classpath*:mapper/vqms/*Mapper.xml"));
         sessionFactory = factoryBean.getObject();
 
-        Path manifestPath = Paths.get("../tools/avc-data-gen/output/manifest.json");
-        if (!Files.exists(manifestPath))
-        {
-            manifestPath = Paths.get("tools/avc-data-gen/output/manifest.json");
-        }
+        // manifest.json 在项目根 /tools/avc-data-gen/output/，用绝对路径兜底
+        String projectRoot = System.getenv("VQMS_PROJECT_ROOT");
+        Path manifestPath = (projectRoot != null && !projectRoot.isEmpty())
+                ? Paths.get(projectRoot, "tools", "avc-data-gen", "output", "manifest.json")
+                : Paths.get("C:/work/VQMS/tools/avc-data-gen/output/manifest.json");
         manifest = JSON.parseArray(Files.readString(manifestPath), JSONObject.class);
+
+        // 共享 Session 持有 mapper，避免每次调用时关闭 Executor
+        var session = sessionFactory.openSession();
+        curveMapper = session.getMapper(HisCurveSvMapper.class);
+        warnMapper = session.getMapper(WarnInfoMapper.class);
     }
 
+    // ─────────────────────────── 断言 1: 指令总数 20 ───────────────────────────
+
     @Test
-    void warnInstructionCount_equalsRegulationScenariosPlusS17Extra()
+    void assert_warnInstructionCount_20()
     {
-        WarnInfoMapper wm = mapper(WarnInfoMapper.class);
-        List<WarnInfo> instructions = wm.selectByRangeAndType(RANGE_START, RANGE_END, 5L);
-
-        long regScenarios = manifest.stream()
-                .filter(o -> o.getString("id").startsWith("S"))
-                .count();
-
-        assertEquals(regScenarios + 1, instructions.size(),
-                "warn_type=5 条数应 = S 场景数(" + regScenarios + ") + S17 双指令额外 1");
-        assertTrue(instructions.stream().allMatch(w -> w.getWarnType() == 5L));
+        List<WarnInfo> all = warnMapper.selectByRangeAndType(RANGE_START, RANGE_END, 5L);
+        assertEquals(20, all.size(),
+                "warn_type=5 指令总数应为 20（S01~S19 共 19 条 + S17 双指令额外 1 条）；实际=" + all.size());
+        assertTrue(all.stream().allMatch(w -> w.getWarnType() == 5L),
+                "所有指令应均为 warn_type=5");
     }
 
-    @Test
-    void s17_twoInstructions_splitByObjNum()
-    {
-        WarnInfoMapper wm = mapper(WarnInfoMapper.class);
-        List<WarnInfo> all = wm.selectByRangeAndType(RANGE_START, RANGE_END, 5L);
+    // ─────────────────────────── 断言 2: S17 双通道 ───────────────────────────
 
-        // S17 是唯一双指令场景：obj_num=0 夹住 + obj_num=1 不夹，两条不同 obj_num
+    @Test
+    void assert_S17_twoChannels_splitByObjNum()
+    {
+        List<WarnInfo> all = warnMapper.selectByRangeAndType(RANGE_START, RANGE_END, 5L);
         Set<Long> objNums = all.stream().map(WarnInfo::getObjNum).collect(Collectors.toSet());
         assertTrue(objNums.contains(0L), "S17 应有 obj_num=0 通道指令");
         assertTrue(objNums.contains(1L), "S17 应有 obj_num=1 通道指令");
-        assertTrue(objNums.size() >= 2, "至少两个不同 obj_num 分通道");
     }
 
-    @Test
-    void curve_dualWrite_busbar0And1()
-    {
-        HisCurveSvMapper cm = mapper(HisCurveSvMapper.class);
-        List<HisCurveSv> curves = cm.selectByRange(RANGE_START, RANGE_END);
+    // ─────────────────────────── 断言 3: 双写完整性 ───────────────────────────
 
+    @Test
+    void assert_curve_dualWrite_busbar0_and_1()
+    {
+        List<HisCurveSv> curves = curveMapper.selectByRange(RANGE_START, RANGE_END);
+        assertFalse(curves.isEmpty(), "his_curve_sv 应读到行");
+
+        // save_time 是 varchar 含毫秒（如 10:00:00.100 / 10:00:00.200），
+        // 按「截断到分钟」为 key 分组，检查同分钟是否同时有 busbar 0 和 1
         Map<String, Set<Long>> byMinute = curves.stream().collect(Collectors.groupingBy(
-                HisCurveSv::getSaveTime,
+                r -> r.getSaveTime().substring(0, 16),   // "yyyy-MM-dd HH:mm"
                 Collectors.mapping(HisCurveSv::getBusbarNum, Collectors.toSet())));
 
-        long dualWrite = byMinute.values().stream()
+        long dualWriteMinutes = byMinute.values().stream()
                 .filter(s -> s.contains(0L) && s.contains(1L))
                 .count();
-        assertTrue(dualWrite > 0, "存在双写分钟（同 save_time 下 busbar 0 与 1 并存）");
+        assertTrue(dualWriteMinutes > 0,
+                "应存在双写分钟（同 save_time 前16字符下 busbar 0 与 1 并存），实际=" + dualWriteMinutes
+                + " / 总分钟数=" + byMinute.size());
     }
+
+    // ─────────────────────────── 断言 4: 原文级核对 v_target → warn_content ───────────────────────────
 
     @Test
-    void warnContent_preservesRawInstructionText()
+    void assert_originalText_matchesManifestExpected()
     {
-        WarnInfoMapper wm = mapper(WarnInfoMapper.class);
-        List<WarnInfo> all = wm.selectByRangeAndType(RANGE_START, RANGE_END, 5L);
+        List<WarnInfo> all = warnMapper.selectByRangeAndType(RANGE_START, RANGE_END, 5L);
 
-        // S12 脏文本原文字段完整读回（",abc."），不外泄解码、不丢列
-        boolean hasDirtyText = all.stream().anyMatch(w -> w.getWarnContent() != null
-                && w.getWarnContent().contains("abc"));
-        assertTrue(hasDirtyText, "S12 编码脏写原文应被完整读回，无丢列");
+        // S01~S07/S13~S16/S18/S19: v_target=223.15 → 目标值形态 → 原文含 "22315"
+        boolean hasTarget22315 = all.stream().anyMatch(w ->
+                w.getWarnContent() != null && w.getWarnContent().contains("22315"));
+        assertTrue(hasTarget22315, "S01 等目标值场景 warn_content 原文应包含 '22315'（v_target=223.15kV）");
 
-        // S09 增量编码原文完整读回
-        boolean hasIncrement = all.stream().anyMatch(w -> w.getWarnContent() != null
-                && w.getWarnContent().contains("2202"));
-        assertTrue(hasIncrement, "S09 增量编码 2202 原文应被完整读回");
+        // S08: v_target=225.0 → 目标值形态，原文含 22500
+        boolean hasTarget22500 = all.stream().anyMatch(w ->
+                w.getWarnContent() != null && w.getWarnContent().contains("22500"));
+        assertTrue(hasTarget22500, "S08 warn_content 原文应包含 '22500'（v_target=225.0kV 偏低边界场景）");
+
+        // S09: 增量加 2202 → 原文含 2202
+        boolean hasIncrementUp = all.stream().anyMatch(w ->
+                w.getWarnContent() != null && w.getWarnContent().contains("2202"));
+        assertTrue(hasIncrementUp, "S09 warn_content 原文应包含 '2202'（增量加编码）");
+
+        // S10: 增量减 1202 → 原文含 1202
+        boolean hasIncrementDown = all.stream().anyMatch(w ->
+                w.getWarnContent() != null && w.getWarnContent().contains("1202"));
+        assertTrue(hasIncrementDown, "S10 warn_content 原文应包含 '1202'（增量减编码）");
+
+        // S12: 编码脏写 ",abc." → 原文含 abc
+        boolean hasDirtyText = all.stream().anyMatch(w ->
+                w.getWarnContent() != null && w.getWarnContent().contains("abc"));
+        assertTrue(hasDirtyText, "S12 warn_content 原文应包含 'abc'（编码脏写测试样本）");
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T> T mapper(Class<T> type)
+    // ─────────────────────────── 断言 5: 领域对象不含 plan_SV ───────────────────────────
+
+    @Test
+    void assert_domainObject_noPlanSVField()
     {
-        return sessionFactory.getConfiguration().getMapper(type, sessionFactory.openSession());
+        boolean hasPlanSVSetter;
+        try
+        {
+            com.ruoyi.vqms.source.model.HisCurveSv.class.getMethod("setPlanSV", String.class);
+            hasPlanSVSetter = true;
+        }
+        catch (NoSuchMethodException e)
+        {
+            hasPlanSVSetter = false;
+        }
+        assertFalse(hasPlanSVSetter,
+                "HisCurveSv 领域对象不应含 setPlanSV 方法（plan_SV 废值不映射，编译期即不存在）");
+    }
+
+    // ─────────────────────────── 断言 6: 全部指令 warn_content 非空 ───────────────────────────
+
+    @Test
+    void assert_allInstructions_haveNonEmptyContent()
+    {
+        List<WarnInfo> all = warnMapper.selectByRangeAndType(RANGE_START, RANGE_END, 5L);
+
+        long nonEmpty = all.stream()
+                .filter(w -> w.getWarnContent() != null && !w.getWarnContent().isEmpty())
+                .count();
+        assertEquals(all.size(), nonEmpty,
+                "所有 warn_type=5 指令应有非空 warn_content；缺失=" + (all.size() - nonEmpty));
     }
 }

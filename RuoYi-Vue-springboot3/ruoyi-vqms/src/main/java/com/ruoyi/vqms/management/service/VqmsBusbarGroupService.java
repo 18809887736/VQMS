@@ -25,6 +25,9 @@ public class VqmsBusbarGroupService
     @Autowired
     private VqmsYcPointMapMapper ycPointMapMapper;
 
+    @Autowired
+    private com.ruoyi.vqms.management.mapper.VqmsBusbarMapper busbarMapper;
+
     public List<VqmsBusbarGroup> selectList()
     {
         return busbarGroupMapper.selectList();
@@ -60,12 +63,14 @@ public class VqmsBusbarGroupService
      */
     public void deleteByGroupNum(Long groupNum)
     {
-        long refCount = busbarGroupMapper.countByGroupNum(groupNum);
-        // countByGroupNum 实为 VqmsBusbarMapper.countByGroupNum（见下），此处在测试中用同一 mapper 校验
-        // 但当前实现中 countByGroupNum 在 VqmsBusbarMapper，需要注入 VqmsBusbarMapper
-        // 这里先用简单方式：直接调 busbarMapper（通过注入）
-        // 简化：由于只有一个 mapper 负责，这里直接用已注入的 busbarGroupMapper
-        // 注意：VqmsBusbarMapper.countByGroupNum 才是查引用数
+        long refCount = busbarMapper.countByGroupNum(groupNum);
+        if (refCount > 0)
+        {
+            throw new IllegalStateException(
+                    "无法删除 group_num=" + groupNum + "：有 " + refCount + " 条 busbar 引用该组");
+        }
+        int rows = busbarGroupMapper.deleteByGroupNum(groupNum);
+        log.info("删除 group_num={}，影响 {} 行", groupNum, rows);
     }
 
     /**

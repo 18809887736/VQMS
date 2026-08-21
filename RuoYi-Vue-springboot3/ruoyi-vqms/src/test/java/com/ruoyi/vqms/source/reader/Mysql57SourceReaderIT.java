@@ -36,8 +36,13 @@ class Mysql57SourceReaderIT
         ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
         ds.setUrl("jdbc:mysql://10.0.0.9:3306/qheatavchisdb"
                 + "?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8");
-        ds.setUsername(System.getenv().getOrDefault("VQMS_AVC_TEST_USER", "root"));
-        ds.setPassword(System.getenv().getOrDefault("VQMS_AVC_TEST_PASSWORD", "syth7777"));
+        // 测试库凭证不入库（CLAUDE.md Security）：环境变量必填
+        String user = System.getenv("VQMS_AVC_TEST_USER");
+        String password = System.getenv("VQMS_AVC_TEST_PASSWORD");
+        assertNotNull(user, "缺少环境变量 VQMS_AVC_TEST_USER");
+        assertNotNull(password, "缺少环境变量 VQMS_AVC_TEST_PASSWORD");
+        ds.setUsername(user);
+        ds.setPassword(password);
 
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
         factoryBean.setDataSource(ds);

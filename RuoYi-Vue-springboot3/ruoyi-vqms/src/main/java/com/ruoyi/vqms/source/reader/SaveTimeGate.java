@@ -39,24 +39,25 @@ public final class SaveTimeGate
 
     /**
      * ① 放宽边界：目标区间前后各扩 1 分钟，格式化为秒精度字符串供 SQL 粗筛。
-     * 边界非法（caller bug）抛 {@link IllegalArgumentException} 快速失败。
+     * 边界非法或区间倒置（caller bug）抛 {@link IllegalArgumentException} 快速失败。
      */
     public static ExpandedBounds expandBounds(String start, String end)
     {
-        LocalDateTime boundStart = requireBound(start);
-        LocalDateTime boundEnd = requireBound(end);
-        return new ExpandedBounds(boundStart.minusMinutes(1).format(MINUTE_TEXT),
-                boundEnd.plusMinutes(1).format(MINUTE_TEXT));
+        LocalDateTime[] window = requireWindow(start, end);
+        return new ExpandedBounds(window[0].minusMinutes(1).format(MINUTE_TEXT),
+                window[1].plusMinutes(1).format(MINUTE_TEXT));
     }
 
     /**
      * ②+③ 逐行：正则校验（坏行跳过+记日志）→ 解析取整 → 按目标区间（闭区间）精确过滤。
-     * 正则通过但解析失败（如不可能日期 2027-02-29）同计坏行。返回行为原实例，原始时间戳不动。
+     * ② canonical 格式 = 空格分隔无空白衬垫（与 ① SQL 字典序假设一致）；正则通过但解析失败
+     * （如不可能日期 2027-02-29）同计坏行。返回行为原实例，原始时间戳不动。
      */
     public static <T> List<T> filter(List<T> rows, Function<T, String> timeOf, String start, String end)
     {
-        LocalDateTime boundStart = requireBound(start);
-        LocalDateTime boundEnd = requireBound(end);
+        LocalDateTime[] window = requireWindow(start, end);
+        LocalDateTime boundStart = window[0];
+        LocalDateTime boundEnd = window[1];
         List<T> kept = new ArrayList<>(rows.size());
         int bad = 0;
         int outOfWindow = 0;
@@ -110,5 +111,17 @@ public final class SaveTimeGate
             throw new IllegalArgumentException("非法查询边界: " + raw);
         }
         return parsed;
+    }
+
+    /** 边界各自可解析 + 区间不倒置——倒置会让 SQL/精滤双双静默空结果，必须快速失败 */
+    private static LocalDateTime[] requireWindow(String start, String end)
+    {
+        LocalDateTime boundStart = requireBound(start);
+        LocalDateTime boundEnd = requireBound(end);
+        if (boundEnd.isBefore(boundStart))
+        {
+            throw new IllegalArgumentException("查询区间倒置: start=" + start + ", end=" + end);
+        }
+        return new LocalDateTime[] { boundStart, boundEnd };
     }
 }

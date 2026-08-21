@@ -13,8 +13,10 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import com.ruoyi.vqms.source.mapper.HisCurveSvMapper;
 import com.ruoyi.vqms.source.mapper.WarnInfoMapper;
+import com.ruoyi.vqms.source.mapper.YcHistoryMapper;
 import com.ruoyi.vqms.source.model.HisCurveSv;
 import com.ruoyi.vqms.source.model.WarnInfo;
+import com.ruoyi.vqms.source.model.YcHistory;
 
 /**
  * D4 三步闸门场景验证（L1，测试方案 §4.4「正例零误杀」）：真实库 qheatavchisdb，
@@ -34,14 +36,27 @@ class D4GateScenarioIT
 
     private static WarnInfoMapper warnMapper;
 
+    private static YcHistoryMapper ycMapper;
+
+    /** 测试库凭证不入库（CLAUDE.md Security）：环境变量必填 */
+    private static String requiredEnv(String name)
+    {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank())
+        {
+            throw new IllegalStateException("缺少环境变量 " + name + "（测试库凭证走环境变量，不入库）");
+        }
+        return value;
+    }
+
     @BeforeAll
     static void setUp() throws Exception
     {
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
         ds.setUrl(DB_URL);
-        ds.setUsername(System.getenv().getOrDefault("VQMS_AVC_TEST_USER", "root"));
-        ds.setPassword(System.getenv().getOrDefault("VQMS_AVC_TEST_PASSWORD", "syth7777"));
+        ds.setUsername(requiredEnv("VQMS_AVC_TEST_USER"));
+        ds.setPassword(requiredEnv("VQMS_AVC_TEST_PASSWORD"));
 
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
         factoryBean.setDataSource(ds);
@@ -50,6 +65,7 @@ class D4GateScenarioIT
         SqlSessionFactory sessionFactory = factoryBean.getObject();
         curveMapper = sessionFactory.getConfiguration().getMapper(HisCurveSvMapper.class, sessionFactory.openSession());
         warnMapper = sessionFactory.getConfiguration().getMapper(WarnInfoMapper.class, sessionFactory.openSession());
+        ycMapper = sessionFactory.getConfiguration().getMapper(YcHistoryMapper.class, sessionFactory.openSession());
     }
 
     /** 指令条数经闸门仍 == 20（manifest 承诺，D1 已核对的同一事实）——闸门不丢正例 */
@@ -106,5 +122,27 @@ class D4GateScenarioIT
                     MinuteRounder.round(MinuteRounder.parse(r.getSaveTime())),
                     "精滤后所有行取整应恰为该分钟: " + r.getSaveTime()));
         }
+    }
+
+    /** 第三表 yc_history（U01–U07 投运率数据所在）：闸门零误杀、不丢直读行（§4.4 26 场景全覆盖收口） */
+    @Test
+    void yc_闸门零误杀_不丢直读行()
+    {
+        SaveTimeGate.ExpandedBounds bounds = SaveTimeGate.expandBounds(RANGE_START, RANGE_END);
+        LocalDateTime windowStart = LocalDateTime.parse("2026-03-15T00:00:00");
+        LocalDateTime windowEnd = LocalDateTime.parse("2026-04-03T00:00:00");
+        List<YcHistory> coarse = ycMapper.selectByRange(bounds.start(), bounds.end());
+        List<YcHistory> gated = SaveTimeGate.filter(coarse, YcHistory::getYcTime, RANGE_START, RANGE_END);
+        List<YcHistory> plain = ycMapper.selectByRange(RANGE_START, RANGE_END);
+        Assertions.assertFalse(gated.isEmpty(), "yc_history 应读到行");
+        java.util.Set<String> gatedTimes = gated.stream().map(YcHistory::getYcTime)
+                .collect(java.util.stream.Collectors.toSet());
+        plain.forEach(r -> Assertions.assertTrue(gatedTimes.contains(r.getYcTime()),
+                "yc_history 直读行被闸门误杀: " + r.getYcTime()));
+        gated.forEach(r -> {
+            LocalDateTime rounded = MinuteRounder.round(MinuteRounder.parse(r.getYcTime()));
+            Assertions.assertFalse(rounded.isBefore(windowStart) || rounded.isAfter(windowEnd),
+                    "yc_history 闸门增留行取整后不在目标区间: " + r.getYcTime());
+        });
     }
 }

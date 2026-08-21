@@ -69,6 +69,25 @@ class SaveTimeGateTest
     }
 
     @Test
+    void assert_T分隔与空白衬垫_按坏行处理()
+    {
+        // ① SQL 字典序对 T/前导空白结构性丢行；② canonical 契约同口径拒收，保证三步一致
+        Assertions.assertTrue(filter(java.util.Arrays.asList(
+                "2026-08-21T10:00:00.000",
+                " 2026-08-21 10:00:00.000",
+                "2026-08-21 10:00:00.000 ")).isEmpty());
+    }
+
+    @Test
+    void assert_倒置区间快速失败()
+    {
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> SaveTimeGate.expandBounds(END, START));
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> SaveTimeGate.filter(List.of(START + ".000"), s -> s, END, START));
+    }
+
+    @Test
     void assert_空列表平安通过()
     {
         Assertions.assertTrue(filter(List.of()).isEmpty());

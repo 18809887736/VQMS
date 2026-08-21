@@ -51,13 +51,15 @@ class SaveTimeGatePropertyTest
 
     // ---------- ① 粗筛窗口不变量 ----------
 
+    /** row 取自窗口附近（偏移 [-2, window+2] 分钟），保证 in-window 分支真实命中 */
     @Property
     void prop_粗筛窗口包含所有目标行(@ForAll("times") LocalDateTime start, @ForAll @IntRange(min = 0, max = 1440) int windowMinutes,
-            @ForAll("times") LocalDateTime row)
+            @ForAll @IntRange(min = -2, max = 1442) int rowOffsetMinutes)
     {
         LocalDateTime end = start.plusMinutes(windowMinutes);
+        LocalDateTime row = start.plusMinutes(rowOffsetMinutes);
         String raw = toRaw(row, 3);
-        if (MinuteRounder.round(row).compareTo(start) >= 0 && MinuteRounder.round(row).compareTo(end) <= 0)
+        if (!MinuteRounder.round(row).isBefore(start) && !MinuteRounder.round(row).isAfter(end))
         {
             SaveTimeGate.ExpandedBounds bounds = SaveTimeGate.expandBounds(
                     start.format(MINUTE_TEXT), end.format(MINUTE_TEXT));
@@ -113,9 +115,10 @@ class SaveTimeGatePropertyTest
 
     @Property
     void prop_过滤恰好保留目标区间内的行(@ForAll("times") LocalDateTime start, @ForAll @IntRange(min = 0, max = 1440) int windowMinutes,
-            @ForAll("times") LocalDateTime row)
+            @ForAll @IntRange(min = -2, max = 1442) int rowOffsetMinutes)
     {
         LocalDateTime end = start.plusMinutes(windowMinutes);
+        LocalDateTime row = start.plusMinutes(rowOffsetMinutes);
         String raw = toRaw(row, 3);
         boolean inTarget = !MinuteRounder.round(row).isBefore(start) && !MinuteRounder.round(row).isAfter(end);
         List<String> kept = SaveTimeGate.filter(List.of(raw), s -> s, start.format(MINUTE_TEXT), end.format(MINUTE_TEXT));

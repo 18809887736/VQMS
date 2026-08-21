@@ -59,8 +59,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <systemPropertyVariables>
-                        <!-- 禁用 jqwik 失败记忆数据库（.jqwik-database）：测试运行不得写仓库状态 -->
-                        <jqwik.database>false</jqwik.database>
+                        <!-- 禁用 jqwik 失败记忆数据库：键 database 语义是路径，空串 = 关（"false" 会被当文件名） -->
+                        <jqwik.database />
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

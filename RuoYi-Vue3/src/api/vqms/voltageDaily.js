@@ -8,11 +8,3 @@ export function listDaily(query) {
     params: query
   })
 }
-
-// 查询电压合格率日报详细
-export function getDaily(id) {
-  return request({
-    url: '/vqms/stats/daily/' + id,
-    method: 'get'
-  })
-}

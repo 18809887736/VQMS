@@ -8,11 +8,3 @@ export function listRegulation(query) {
     params: query
   })
 }
-
-// 查询 AVC 调节合格率详细
-export function getRegulation(id) {
-  return request({
-    url: '/vqms/avc/regulation/' + id,
-    method: 'get'
-  })
-}

@@ -33,11 +33,20 @@
 
     <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" prop="id" width="80" />
-      <el-table-column label="母线编号" prop="busbarNum" width="120" />
-      <el-table-column label="下限(kV)" prop="lowLimit" width="120" />
-      <el-table-column label="上限(kV)" prop="highLimit" width="120" />
-      <el-table-column label="容差(kV)" prop="toleranceV" width="120" />
+      <el-table-column label="ID" prop="thresholdId" width="80" />
+      <el-table-column label="母线编号" prop="busbarNum" width="100" />
+      <el-table-column label="口径" prop="criterionType" width="140">
+        <template #default="scope">
+          <span>{{ scope.row.criterionType === 'AVC' ? 'AVC 控制达标率' : scope.row.criterionType === 'GB' ? '国标±10%' : scope.row.criterionType }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="容差(kV)" prop="toleranceV" width="110" />
+      <el-table-column label="生效起始日" prop="effectiveFrom" width="130" />
+      <el-table-column label="生效结束日" prop="effectiveTo" width="130">
+        <template #default="scope">
+          <span>{{ scope.row.effectiveTo || '至今' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-tooltip content="修改" placement="top">
@@ -63,14 +72,20 @@
         <el-form-item label="母线编号" prop="busbarNum">
           <el-input v-model="form.busbarNum" placeholder="请输入母线编号" />
         </el-form-item>
-        <el-form-item label="下限(kV)" prop="lowLimit">
-          <el-input-number v-model="form.lowLimit" :precision="3" :step="0.1" controls-position="right" />
-        </el-form-item>
-        <el-form-item label="上限(kV)" prop="highLimit">
-          <el-input-number v-model="form.highLimit" :precision="3" :step="0.1" controls-position="right" />
+        <el-form-item label="口径" prop="criterionType">
+          <el-select v-model="form.criterionType" placeholder="请选择口径">
+            <el-option label="AVC 控制达标率" value="AVC" />
+            <el-option label="国标±10%" value="GB" />
+          </el-select>
         </el-form-item>
         <el-form-item label="容差(kV)" prop="toleranceV">
           <el-input-number v-model="form.toleranceV" :precision="3" :step="0.1" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="生效起始日" prop="effectiveFrom">
+          <el-date-picker v-model="form.effectiveFrom" type="date" value-format="YYYY-MM-DD" placeholder="选择生效起始日" />
+        </el-form-item>
+        <el-form-item label="生效结束日" prop="effectiveTo">
+          <el-date-picker v-model="form.effectiveTo" type="date" value-format="YYYY-MM-DD" placeholder="留空=至今有效" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -107,8 +122,8 @@ const data = reactive({
   },
   rules: {
     busbarNum: [{ required: true, message: '母线编号不能为空', trigger: 'blur' }],
-    lowLimit: [{ required: true, message: '下限不能为空', trigger: 'blur' }],
-    highLimit: [{ required: true, message: '上限不能为空', trigger: 'blur' }]
+    criterionType: [{ required: true, message: '口径不能为空', trigger: 'change' }],
+    effectiveFrom: [{ required: true, message: '生效起始日不能为空', trigger: 'change' }]
   }
 })
 const { queryParams, form, rules } = toRefs(data)
@@ -143,21 +158,18 @@ function handleAdd() {
 }
 
 function handleUpdate(row) {
-  const id = row.id || ids.value
+  const id = row.thresholdId || ids.value[0]
   getThreshold(id).then(response => {
     Object.assign(form.value, response.data)
     open.value = true
     title.value = '修改母线阈值'
-  }).catch(() => {
-    // 后端未就绪兜底
-    proxy.$modal.msgWarning('后端接口未就绪（阶段 2 仅 UI 壳）')
-  })
+  }).catch(() => {})
 }
 
 function submitForm() {
   proxy.$refs['thresholdRef'].validate(valid => {
     if (!valid) return
-    if (form.value.id != null) {
+    if (form.value.thresholdId != null) {
       updateThreshold(form.value).then(() => {
         proxy.$modal.msgSuccess('修改成功')
         open.value = false
@@ -174,7 +186,7 @@ function submitForm() {
 }
 
 function handleDelete(row) {
-  const delIds = row.id || ids.value
+  const delIds = row.thresholdId || ids.value
   proxy.$modal.confirm('是否确认删除母线阈值编号为"' + delIds + '"的数据项?').then(function () {
     return delThreshold(delIds)
   }).then(() => {
@@ -188,18 +200,19 @@ function handleExport() {
 }
 
 function handleSelectionChange(selection) {
-  ids.value = selection.map(item => item.id)
+  ids.value = selection.map(item => item.thresholdId)
   single.value = selection.length !== 1
   multiple.value = !selection.length
 }
 
 function reset() {
   form.value = {
-    id: undefined,
+    thresholdId: undefined,
     busbarNum: undefined,
-    lowLimit: undefined,
-    highLimit: undefined,
-    toleranceV: undefined
+    criterionType: undefined,
+    toleranceV: undefined,
+    effectiveFrom: undefined,
+    effectiveTo: undefined
   }
   proxy.resetForm('thresholdRef')
 }

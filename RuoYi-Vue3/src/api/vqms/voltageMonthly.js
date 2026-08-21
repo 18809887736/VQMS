@@ -8,11 +8,3 @@ export function listMonthly(query) {
     params: query
   })
 }
-
-// 查询电压合格率月报详细
-export function getMonthly(id) {
-  return request({
-    url: '/vqms/stats/monthly/' + id,
-    method: 'get'
-  })
-}

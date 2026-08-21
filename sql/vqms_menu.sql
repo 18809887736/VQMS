@@ -78,3 +78,8 @@ insert into sys_menu values('2038', '母线选择-日报', '2001', '2', '', '', 
 insert into sys_menu values('2039', '母线选择-月报', '2002', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2040', '母线选择-年报', '2003', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2041', '母线选择-阈值', '2031', '6', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_role_menu values('2', '2037');
+insert into sys_role_menu values('2', '2038');
+insert into sys_role_menu values('2', '2039');
+insert into sys_role_menu values('2', '2040');
+insert into sys_role_menu values('2', '2041');

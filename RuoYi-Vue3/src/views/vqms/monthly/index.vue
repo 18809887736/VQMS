@@ -82,7 +82,7 @@ const data = reactive({
 })
 const { queryParams } = toRefs(data)
 
-// 阶段 2 占位：与 sql/vqms.sql busbar 种子数据一致；后端 /vqms/busbar 列表接口就绪后改为接口拉取
+// 阶段 2 占位：与 sql/vqms.sql busbar 种子数据一致；后端 /vqms/vqms_busbar/list 列表接口就绪后改为接口拉取
 const busbarList = [
   { busbarNum: '0', busbarName: '220kV 东母线', vGrade: '1' },
   { busbarNum: '1', busbarName: '220kV 西母线', vGrade: '1' }
@@ -122,7 +122,7 @@ function resetQuery() {
 }
 
 function handleExport() {
-  proxy.download('vqms/monthly/export', { ...queryParams.value }, `monthly_${new Date().getTime()}.xlsx`)
+  proxy.download('vqms/stats/monthly/export', { ...queryParams.value }, `monthly_${new Date().getTime()}.xlsx`)
 }
 
 getList()

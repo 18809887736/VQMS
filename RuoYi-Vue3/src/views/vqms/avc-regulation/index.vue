@@ -109,7 +109,7 @@ function resetQuery() {
 }
 
 function handleExport() {
-  proxy.download('vqms/avc-regulation/export', { ...queryParams.value }, `avc_regulation_${new Date().getTime()}.xlsx`)
+  proxy.download('vqms/avc/regulation/export', { ...queryParams.value }, `avc_regulation_${new Date().getTime()}.xlsx`)
 }
 
 getList()

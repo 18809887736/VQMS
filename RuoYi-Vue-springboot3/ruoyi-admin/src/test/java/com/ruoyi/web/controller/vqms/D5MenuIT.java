@@ -112,7 +112,7 @@ class D5MenuIT
         String[] expected = { "vqms:daily:export", "vqms:monthly:export", "vqms:yearly:export",
                 "vqms:avc:runtime:export", "vqms:avc:regulation:export",
                 "vqms:threshold:query", "vqms:threshold:add", "vqms:threshold:edit",
-                "vqms:threshold:remove", "vqms:threshold:export" };
+                "vqms:threshold:remove", "vqms:threshold:export", "vqms:vqms_busbar:list" };
         for (String perm : expected)
         {
             try (Statement st = connection.createStatement();
@@ -120,8 +120,23 @@ class D5MenuIT
                             "select count(*) from sys_menu where perms = '" + perm + "' and menu_type = 'F'"))
             {
                 rs.next();
-                Assertions.assertEquals(1, rs.getInt(1), "按钮 perm 缺: " + perm);
+                // busbar 下拉 perm 有意挂 5 处 F（每个母线维度页面一处），其余唯一
+                int minExpected = "vqms:vqms_busbar:list".equals(perm) ? 5 : 1;
+                Assertions.assertEquals(minExpected, rs.getInt(1), "按钮 perm 行数不符: " + perm);
             }
+        }
+    }
+
+    @Test
+    void assert_全部VQMS菜单绑定role2() throws Exception
+    {
+        try (Statement st = connection.createStatement();
+                ResultSet rs = st.executeQuery(
+                        "select count(*) from sys_menu m where m.menu_id between 2000 and 2099 "
+                                + "and not exists (select 1 from sys_role_menu rm where rm.menu_id = m.menu_id)"))
+        {
+            rs.next();
+            Assertions.assertEquals(0, rs.getInt(1), "存在未绑定任何角色的 VQMS 菜单（非 admin 用户将不可见/无权）");
         }
     }
 }

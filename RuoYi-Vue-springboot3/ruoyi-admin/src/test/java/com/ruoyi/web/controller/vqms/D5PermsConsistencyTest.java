@@ -58,6 +58,34 @@ class D5PermsConsistencyTest
         }
     }
 
+    @Test
+    void assert_前端页面perms不漂移() throws Exception
+    {
+        Set<String> frontendPerms = new HashSet<>();
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("'(vqms:[a-z_:]+)'");
+        try (var stream = Files.list(Paths.get("..", "..", "RuoYi-Vue3", "src", "views", "vqms").toAbsolutePath().normalize()))
+        {
+            for (Path dir : stream.filter(Files::isDirectory).toList())
+            {
+                Path vue = dir.resolve("index.vue");
+                if (!Files.exists(vue))
+                {
+                    continue;
+                }
+                Matcher m = p.matcher(Files.readString(vue));
+                while (m.find())
+                {
+                    frontendPerms.add(m.group(1));
+                }
+            }
+        }
+        Assertions.assertFalse(frontendPerms.isEmpty(), "未扫到任何前端 perms，路径可能错了");
+        for (String perm : frontendPerms)
+        {
+            Assertions.assertTrue(SPEC_PERMS.contains(perm), "前端使用了清单外 perm: " + perm);
+        }
+    }
+
     private static Set<String> controllerPerms()
     {
         Set<String> perms = new HashSet<>();

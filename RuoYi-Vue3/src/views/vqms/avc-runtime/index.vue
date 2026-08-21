@@ -96,7 +96,7 @@ function resetQuery() {
 }
 
 function handleExport() {
-  proxy.download('vqms/avc-runtime/export', { ...queryParams.value }, `avc_runtime_${new Date().getTime()}.xlsx`)
+  proxy.download('vqms/avc/runtime/export', { ...queryParams.value }, `avc_runtime_${new Date().getTime()}.xlsx`)
 }
 
 getList()

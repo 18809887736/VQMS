@@ -8,11 +8,3 @@ export function listRuntime(query) {
     params: query
   })
 }
-
-// 查询 AVC 投运率详细
-export function getRuntime(id) {
-  return request({
-    url: '/vqms/avc/runtime/' + id,
-    method: 'get'
-  })
-}

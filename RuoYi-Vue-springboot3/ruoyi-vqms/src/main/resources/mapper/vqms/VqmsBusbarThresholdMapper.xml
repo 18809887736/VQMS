@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsBusbarThresholdMapper">
+    <resultMap type="com.ruoyi.vqms.management.domain.VqmsBusbarThreshold" id="VqmsBusbarThresholdResult">
+        <id     property="thresholdId"     column="threshold_id"/>
+        <result property="busbarNum"       column="busbar_num"/>
+        <result property="criterionType"   column="criterion_type"/>
+        <result property="toleranceV"      column="tolerance_v"/>
+        <result property="planSvInvalidPolicy" column="plan_sv_invalid_policy"/>
+        <result property="effectiveFrom"   column="effective_from"/>
+        <result property="effectiveTo"     column="effective_to"/>
+        <result property="createBy"        column="create_by"/>
+        <result property="createTime"      column="create_time"/>
+        <result property="updateBy"        column="update_by"/>
+        <result property="updateTime"      column="update_time"/>
+        <result property="remark"          column="remark"/>
+    </resultMap>
+
+    <sql id="selectBusbarThresholdVo">
+        select threshold_id, busbar_num, criterion_type, tolerance_v,
+               plan_sv_invalid_policy, effective_from, effective_to,
+               create_by, create_time, update_by, update_time, remark
+        from vqms_busbar_threshold
+    </sql>
+
+    <select id="selectList" resultMap="VqmsBusbarThresholdResult">
+        <include refid="selectBusbarThresholdVo"/>
+    </select>
+
+    <select id="selectById" resultMap="VqmsBusbarThresholdResult">
+        <include refid="selectBusbarThresholdVo"/>
+        where threshold_id = #{thresholdId}
+    </select>
+
+    <!-- 按 busbar + 日期找当前生效区间阈值 -->
+    <select id="selectByBusbarAndDate" resultMap="VqmsBusbarThresholdResult">
+        <include refid="selectBusbarThresholdVo"/>
+        where busbar_num = #{busbarNum}
+          and effective_from &lt;= #{dateStr}
+          and (effective_to is null or effective_to &gt;= #{dateStr})
+        limit 1
+    </select>
+
+    <select id="selectEffectiveByBusbarNum" resultMap="VqmsBusbarThresholdResult">
+        <include refid="selectBusbarThresholdVo"/>
+        where busbar_num = #{busbarNum}
+          and effective_from &lt;= #{dateStr}
+          and (effective_to is null or effective_to &gt;= #{dateStr})
+    </select>
+
+    <!-- 闭合旧记录：将 effective_to 设为当前日期前一天 -->
+    <update id="closeExistingByBusbarNum">
+        update vqms_busbar_threshold
+        set effective_to = date_sub(curdate(), interval 1 day),
+            update_time = sysdate()
+        where busbar_num = #{busbarNum}
+          and effective_to is null
+    </update>
+
+    <insert id="insert" parameterType="com.ruoyi.vqms.management.domain.VqmsBusbarThreshold"
+            useGeneratedKeys="true" keyProperty="thresholdId">
+        insert into vqms_busbar_threshold
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="busbarNum != null">busbar_num,</if>
+            <if test="criterionType != null and criterionType != ''">criterion_type,</if>
+            <if test="toleranceV != null">tolerance_v,</if>
+            <if test="planSvInvalidPolicy != null">plan_sv_invalid_policy,</if>
+            <if test="effectiveFrom != null">effective_from,</if>
+            <if test="effectiveTo != null">effective_to,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="busbarNum != null">#{busbarNum},</if>
+            <if test="criterionType != null and criterionType != ''">#{criterionType},</if>
+            <if test="toleranceV != null">#{toleranceV},</if>
+            <if test="planSvInvalidPolicy != null">#{planSvInvalidPolicy},</if>
+            <if test="effectiveFrom != null">#{effectiveFrom},</if>
+            <if test="effectiveTo != null">#{effectiveTo},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="com.ruoyi.vqms.management.domain.VqmsBusbarThreshold">
+        update vqms_busbar_threshold
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="busbarNum != null">busbar_num = #{busbarNum},</if>
+            <if test="criterionType != null and criterionType != ''">criterion_type = #{criterionType},</if>
+            <if test="toleranceV != null">tolerance_v = #{toleranceV},</if>
+            <if test="planSvInvalidPolicy != null">plan_sv_invalid_policy = #{planSvInvalidPolicy},</if>
+            <if test="effectiveFrom != null">effective_from = #{effectiveFrom},</if>
+            <if test="effectiveTo != null">effective_to = #{effectiveTo},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where threshold_id = #{thresholdId}
+    </update>
+
+    <delete id="deleteById" parameterType="Long">
+        delete from vqms_busbar_threshold where threshold_id = #{thresholdId}
+    </delete>
+
+    <select id="countByBusbarNum" resultType="long">
+        select count(*) from vqms_busbar_threshold where busbar_num = #{busbarNum}
+    </select>
+</mapper>

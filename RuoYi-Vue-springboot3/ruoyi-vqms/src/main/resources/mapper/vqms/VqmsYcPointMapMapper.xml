@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsYcPointMapMapper">
+    <resultMap type="com.ruoyi.vqms.management.domain.VqmsYcPointMap" id="VqmsYcPointMapResult">
+        <id     property="ycNum"       column="yc_num"/>
+        <result property="pointName"   column="point_name"/>
+        <result property="pointType"   column="point_type"/>
+        <result property="unit"        column="unit"/>
+        <result property="state1Label" column="state_1_label"/>
+        <result property="state0Label" column="state_0_label"/>
+        <result property="gateEnabled" column="gate_enabled"/>
+        <result property="remark"      column="remark"/>
+        <result property="createTime"  column="create_time"/>
+        <result property="updateTime"  column="update_time"/>
+    </resultMap>
+
+    <sql id="selectYcPointMapVo">
+        select yc_num, point_name, point_type, unit, state_1_label, state_0_label,
+               gate_enabled, remark, create_time, update_time
+        from vqms_yc_point_map
+    </sql>
+
+    <select id="selectList" resultMap="VqmsYcPointMapResult">
+        <include refid="selectYcPointMapVo"/>
+    </select>
+
+    <select id="selectByYcNum" resultMap="VqmsYcPointMapResult">
+        <include refid="selectYcPointMapVo"/>
+        where yc_num = #{ycNum}
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.vqms.management.domain.VqmsYcPointMap"
+            useGeneratedKeys="false">
+        insert into vqms_yc_point_map
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="ycNum != null">yc_num,</if>
+            <if test="pointName != null and pointName != ''">point_name,</if>
+            <if test="pointType != null">point_type,</if>
+            <if test="unit != null">unit,</if>
+            <if test="state1Label != null">state_1_label,</if>
+            <if test="state0Label != null">state_0_label,</if>
+            <if test="gateEnabled != null">gate_enabled,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="ycNum != null">#{ycNum},</if>
+            <if test="pointName != null and pointName != ''">#{pointName},</if>
+            <if test="pointType != null">#{pointType},</if>
+            <if test="unit != null">#{unit},</if>
+            <if test="state1Label != null">#{state1Label},</if>
+            <if test="state0Label != null">#{state0Label},</if>
+            <if test="gateEnabled != null">#{gateEnabled},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="com.ruoyi.vqms.management.domain.VqmsYcPointMap">
+        update vqms_yc_point_map
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="pointName != null and pointName != ''">point_name = #{pointName},</if>
+            <if test="pointType != null">point_type = #{pointType},</if>
+            <if test="unit != null">unit = #{unit},</if>
+            <if test="state1Label != null">state_1_label = #{state1Label},</if>
+            <if test="state0Label != null">state_0_label = #{state0Label},</if>
+            <if test="gateEnabled != null">gate_enabled = #{gateEnabled},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where yc_num = #{ycNum}
+    </update>
+
+    <delete id="deleteByYcNum" parameterType="Long">
+        delete from vqms_yc_point_map where yc_num = #{ycNum}
+    </delete>
+
+    <select id="countByYcNum" resultType="long">
+        select count(*) from vqms_yc_point_map where yc_num = #{ycNum}
+    </select>
+</mapper>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsBusbarMapper">
+    <resultMap type="com.ruoyi.vqms.management.domain.VqmsBusbar" id="VqmsBusbarResult">
+        <id     property="busbarNum"   column="busbar_num"/>
+        <result property="busbarName"  column="busbar_name"/>
+        <result property="vGrade"      column="v_grade"/>
+        <result property="groupNum"    column="group_num"/>
+        <result property="nominalKv"   column="nominal_kv"/>
+        <result property="status"      column="status"/>
+        <result property="createBy"    column="create_by"/>
+        <result property="createTime"  column="create_time"/>
+        <result property="updateBy"    column="update_by"/>
+        <result property="updateTime"  column="update_time"/>
+        <result property="remark"      column="remark"/>
+    </resultMap>
+
+    <sql id="selectBusbarVo">
+        select busbar_num, busbar_name, v_grade, group_num, nominal_kv,
+               status, create_by, create_time, update_by, update_time, remark
+        from vqms_busbar
+    </sql>
+
+    <select id="selectList" resultMap="VqmsBusbarResult">
+        <include refid="selectBusbarVo"/>
+    </select>
+
+    <select id="selectByBusbarNum" resultMap="VqmsBusbarResult">
+        <include refid="selectBusbarVo"/>
+        where busbar_num = #{busbarNum}
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.vqms.management.domain.VqmsBusbar"
+            useGeneratedKeys="false">
+        insert into vqms_busbar
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="busbarNum != null">busbar_num,</if>
+            <if test="busbarName != null and busbarName != ''">busbar_name,</if>
+            <if test="vGrade != null">v_grade,</if>
+            <if test="groupNum != null">group_num,</if>
+            <if test="nominalKv != null">nominal_kv,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="busbarNum != null">#{busbarNum},</if>
+            <if test="busbarName != null and busbarName != ''">#{busbarName},</if>
+            <if test="vGrade != null">#{vGrade},</if>
+            <if test="groupNum != null">#{groupNum},</if>
+            <if test="nominalKv != null">#{nominalKv},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="com.ruoyi.vqms.management.domain.VqmsBusbar">
+        update vqms_busbar
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="busbarName != null and busbarName != ''">busbar_name = #{busbarName},</if>
+            <if test="vGrade != null">v_grade = #{vGrade},</if>
+            <if test="groupNum != null">group_num = #{groupNum},</if>
+            <if test="nominalKv != null">nominal_kv = #{nominalKv},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where busbar_num = #{busbarNum}
+    </update>
+
+    <delete id="deleteByBusbarNum" parameterType="Long">
+        delete from vqms_busbar where busbar_num = #{busbarNum}
+    </delete>
+
+    <select id="countByBusbarNum" resultType="long">
+        select count(*) from vqms_busbar where busbar_num = #{busbarNum}
+    </select>
+
+    <select id="countByGroupNum" resultType="long">
+        select count(*) from vqms_busbar where group_num = #{groupNum}
+    </select>
+</mapper>

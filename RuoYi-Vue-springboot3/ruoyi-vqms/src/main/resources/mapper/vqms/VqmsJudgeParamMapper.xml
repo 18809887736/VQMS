@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsJudgeParamMapper">
+    <resultMap type="com.ruoyi.vqms.management.domain.VqmsJudgeParam" id="VqmsJudgeParamResult">
+        <id     property="paramId"     column="param_id"/>
+        <result property="paramKey"    column="param_key"/>
+        <result property="paramValue"  column="param_value"/>
+        <result property="name"        column="name"/>
+        <result property="description" column="description"/>
+        <result property="valueMin"    column="value_min"/>
+        <result property="valueMax"    column="value_max"/>
+        <result property="status"      column="status"/>
+        <result property="createBy"    column="create_by"/>
+        <result property="createTime"  column="create_time"/>
+        <result property="updateBy"    column="update_by"/>
+        <result property="updateTime"  column="update_time"/>
+        <result property="remark"      column="remark"/>
+    </resultMap>
+
+    <sql id="selectJudgeParamVo">
+        select param_id, param_key, param_value, name, description,
+               value_min, value_max, status,
+               create_by, create_time, update_by, update_time, remark
+        from vqms_judge_param
+    </sql>
+
+    <select id="selectList" resultMap="VqmsJudgeParamResult">
+        <include refid="selectJudgeParamVo"/>
+    </select>
+
+    <select id="selectByKey" resultMap="VqmsJudgeParamResult">
+        <include refid="selectJudgeParamVo"/>
+        where param_key = #{paramKey}
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.vqms.management.domain.VqmsJudgeParam"
+            useGeneratedKeys="true" keyProperty="paramId">
+        insert into vqms_judge_param
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="paramKey != null and paramKey != ''">param_key,</if>
+            <if test="paramValue != null">param_value,</if>
+            <if test="name != null and name != ''">name,</if>
+            <if test="description != null">description,</if>
+            <if test="valueMin != null">value_min,</if>
+            <if test="valueMax != null">value_max,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="paramKey != null and paramKey != ''">#{paramKey},</if>
+            <if test="paramValue != null">#{paramValue},</if>
+            <if test="name != null and name != ''">#{name},</if>
+            <if test="description != null">#{description},</if>
+            <if test="valueMin != null">#{valueMin},</if>
+            <if test="valueMax != null">#{valueMax},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="com.ruoyi.vqms.management.domain.VqmsJudgeParam">
+        update vqms_judge_param
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="paramValue != null">param_value = #{paramValue},</if>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="valueMin != null">value_min = #{valueMin},</if>
+            <if test="valueMax != null">value_max = #{valueMax},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where param_id = #{paramId}
+    </update>
+
+    <delete id="deleteById" parameterType="Long">
+        delete from vqms_judge_param where param_id = #{paramId}
+    </delete>
+
+    <select id="countByKey" resultType="long">
+        select count(*) from vqms_judge_param where param_key = #{paramKey}
+    </select>
+</mapper>

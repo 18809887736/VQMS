@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsBusbarGroupMapper">
+    <resultMap type="com.ruoyi.vqms.management.domain.VqmsBusbarGroup" id="VqmsBusbarGroupResult">
+        <id     property="groupNum"      column="group_num"/>
+        <result property="groupName"     column="group_name"/>
+        <result property="vGrade"        column="v_grade"/>
+        <result property="mainIndicatorYcNum" column="main_indicator_yc_num"/>
+        <result property="defaultMainBusbarNum" column="default_main_busbar_num"/>
+        <result property="maxStalenessMinutes" column="max_staleness_minutes"/>
+        <result property="remark"         column="remark"/>
+        <result property="createTime"     column="create_time"/>
+        <result property="updateTime"     column="update_time"/>
+    </resultMap>
+
+    <sql id="selectBusbarGroupVo">
+        select group_num, group_name, v_grade, main_indicator_yc_num,
+               default_main_busbar_num, max_staleness_minutes, remark,
+               create_time, update_time
+        from vqms_busbar_group
+    </sql>
+
+    <select id="selectList" resultMap="VqmsBusbarGroupResult">
+        <include refid="selectBusbarGroupVo"/>
+    </select>
+
+    <select id="selectByGroupNum" resultMap="VqmsBusbarGroupResult">
+        <include refid="selectBusbarGroupVo"/>
+        where group_num = #{groupNum}
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.vqms.management.domain.VqmsBusbarGroup"
+            useGeneratedKeys="true" keyProperty="groupNum">
+        insert into vqms_busbar_group
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="groupNum != null">group_num,</if>
+            <if test="groupName != null and groupName != ''">group_name,</if>
+            <if test="vGrade != null">v_grade,</if>
+            <if test="mainIndicatorYcNum != null">main_indicator_yc_num,</if>
+            <if test="defaultMainBusbarNum != null">default_main_busbar_num,</if>
+            <if test="maxStalenessMinutes != null">max_staleness_minutes,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="groupNum != null">#{groupNum},</if>
+            <if test="groupName != null and groupName != ''">#{groupName},</if>
+            <if test="vGrade != null">#{vGrade},</if>
+            <if test="mainIndicatorYcNum != null">#{mainIndicatorYcNum},</if>
+            <if test="defaultMainBusbarNum != null">#{defaultMainBusbarNum},</if>
+            <if test="maxStalenessMinutes != null">#{maxStalenessMinutes},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="com.ruoyi.vqms.management.domain.VqmsBusbarGroup">
+        update vqms_busbar_group
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="groupName != null and groupName != ''">group_name = #{groupName},</if>
+            <if test="vGrade != null">v_grade = #{vGrade},</if>
+            <if test="mainIndicatorYcNum != null">main_indicator_yc_num = #{mainIndicatorYcNum},</if>
+            <if test="defaultMainBusbarNum != null">default_main_busbar_num = #{defaultMainBusbarNum},</if>
+            <if test="maxStalenessMinutes != null">max_staleness_minutes = #{maxStalenessMinutes},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where group_num = #{groupNum}
+    </update>
+
+    <delete id="deleteByGroupNum" parameterType="Long">
+        delete from vqms_busbar_group where group_num = #{groupNum}
+    </delete>
+
+    <select id="countByGroupNum" resultType="long">
+        select count(*) from vqms_busbar_group where group_num = #{groupNum}
+    </select>
+</mapper>

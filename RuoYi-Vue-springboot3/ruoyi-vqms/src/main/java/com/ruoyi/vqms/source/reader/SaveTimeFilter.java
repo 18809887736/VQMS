@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  */
 final class SaveTimeFilter
 {
-    private static final Pattern PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?");
+    private static final Pattern PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?");
 
     private SaveTimeFilter()
     {

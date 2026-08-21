@@ -15,13 +15,13 @@ import com.ruoyi.vqms.source.mapper.YcHistoryMapper;
 /**
  * MySQL 5.7 外部数据源读取实现（SourceReader）。
  *
- * <p>经 RuoYi 多数据源 {@code SLAVE} 访问外部源（只读，v5.0 §5）。</p>
+ * <p>经 RuoYi 多数据源 {@code SLAVE} 访问外部源（只读，v5.0 §5）。
+ * D4 三步闸门：① {@link SaveTimeGate#expandBounds} 放宽边界给 SQL 粗筛，
+ * ②+③ {@link SaveTimeGate#filter} 正则校验 + 取整后按目标区间精确过滤。</p>
  */
 @Component
 public class Mysql57SourceReader implements SourceReader
 {
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Mysql57SourceReader.class);
-
     @Autowired
     private HisCurveSvMapper hisCurveSvMapper;
 
@@ -35,40 +35,26 @@ public class Mysql57SourceReader implements SourceReader
     @DataSource(DataSourceType.SLAVE)
     public List<HisCurveSv> readCurve(String startTime, String endTime, Long busbarNum)
     {
-        List<HisCurveSv> rows = hisCurveSvMapper.selectByRangeAndBusbar(startTime, endTime, busbarNum);
-        int before = rows.size();
-        rows.removeIf(r -> !SaveTimeFilter.isValid(r.getSaveTime()));
-        logBeforeAfter("his_curve_sv", before, rows.size());
-        return rows;
+        SaveTimeGate.ExpandedBounds bounds = SaveTimeGate.expandBounds(startTime, endTime);
+        List<HisCurveSv> rows = hisCurveSvMapper.selectByRangeAndBusbar(bounds.start(), bounds.end(), busbarNum);
+        return SaveTimeGate.filter(rows, HisCurveSv::getSaveTime, startTime, endTime);
     }
 
     @Override
     @DataSource(DataSourceType.SLAVE)
     public List<YcHistory> readYc(String startTime, String endTime, Long ycNum)
     {
-        List<YcHistory> rows = ycHistoryMapper.selectByRangeAndYc(startTime, endTime, ycNum);
-        int before = rows.size();
-        rows.removeIf(r -> !SaveTimeFilter.isValid(r.getYcTime()));
-        logBeforeAfter("yc_history", before, rows.size());
-        return rows;
+        SaveTimeGate.ExpandedBounds bounds = SaveTimeGate.expandBounds(startTime, endTime);
+        List<YcHistory> rows = ycHistoryMapper.selectByRangeAndYc(bounds.start(), bounds.end(), ycNum);
+        return SaveTimeGate.filter(rows, YcHistory::getYcTime, startTime, endTime);
     }
 
     @Override
     @DataSource(DataSourceType.SLAVE)
     public List<WarnInfo> readWarn(String startTime, String endTime, Long warnType)
     {
-        List<WarnInfo> rows = warnInfoMapper.selectByRangeAndType(startTime, endTime, warnType);
-        int before = rows.size();
-        rows.removeIf(r -> !SaveTimeFilter.isValid(r.getWarnTime()));
-        logBeforeAfter("warn_info", before, rows.size());
-        return rows;
-    }
-
-    private void logBeforeAfter(String table, int before, int after)
-    {
-        if (after < before)
-        {
-            log.warn("{} 坏行跳过: {}/{} 行", table, before - after, before);
-        }
+        SaveTimeGate.ExpandedBounds bounds = SaveTimeGate.expandBounds(startTime, endTime);
+        List<WarnInfo> rows = warnInfoMapper.selectByRangeAndType(bounds.start(), bounds.end(), warnType);
+        return SaveTimeGate.filter(rows, WarnInfo::getWarnTime, startTime, endTime);
     }
 }

@@ -1,5 +1,5 @@
 -- =============================================================================
--- VQMS 业务菜单初始化（阶段 2）
+-- VQMS 业务菜单初始化（阶段 2；2026-08-21 D5 修订：avc-runtime/avc-regulation perms 改冒号段，对齐 v5.0 §10.1）
 -- menu_id 从 2000 起（sys_menu 内置到 ~1061，auto_increment 起点 2000，不冲突）
 -- 列顺序：(menu_id, menu_name, parent_id, order_num, path, component, query,
 --         route_name, is_frame, is_cache, menu_type, visible, status, perms, icon,
@@ -32,11 +32,11 @@ insert into sys_menu values('2006', '年报导出', '2003', '1', '', '', '', '',
 insert into sys_menu values('2011', '电压曲线', '2010', '1', 'voltage', 'vqms/curve/index', '', 'VqmsCurve', 1, 0, 'C', '0', '0', 'vqms:curve:list', 'chart', 'admin', sysdate(), '', null, '母线电压曲线查询');
 
 -- ---------- AVC 考核 -> 菜单（C）----------
-insert into sys_menu values('2021', '投运率', '2020', '1', 'runtime', 'vqms/avc-runtime/index', '', 'VqmsAvcRuntime', 1, 0, 'C', '0', '0', 'vqms:avc-runtime:list', 'chart', 'admin', sysdate(), '', null, 'AVC 装置投运率');
-insert into sys_menu values('2022', '调节合格率', '2020', '2', 'regulation', 'vqms/avc-regulation/index', '', 'VqmsAvcRegulation', 1, 0, 'C', '0', '0', 'vqms:avc-regulation:list', 'chart', 'admin', sysdate(), '', null, 'AVC 调节合格率（快速性/经济性两档平行）');
+insert into sys_menu values('2021', '投运率', '2020', '1', 'runtime', 'vqms/avc-runtime/index', '', 'VqmsAvcRuntime', 1, 0, 'C', '0', '0', 'vqms:avc:runtime:list', 'chart', 'admin', sysdate(), '', null, 'AVC 装置投运率');
+insert into sys_menu values('2022', '调节合格率', '2020', '2', 'regulation', 'vqms/avc-regulation/index', '', 'VqmsAvcRegulation', 1, 0, 'C', '0', '0', 'vqms:avc:regulation:list', 'chart', 'admin', sysdate(), '', null, 'AVC 调节合格率（快速性/经济性两档平行）');
 -- 按钮：导出
-insert into sys_menu values('2023', '投运率导出', '2021', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:avc-runtime:export', '#', 'admin', sysdate(), '', null, '');
-insert into sys_menu values('2024', '调节合格率导出', '2022', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:avc-regulation:export', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2023', '投运率导出', '2021', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:avc:runtime:export', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2024', '调节合格率导出', '2022', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:avc:regulation:export', '#', 'admin', sysdate(), '', null, '');
 
 -- ---------- 系统配置 -> 阈值管理 菜单（C）+ 按钮（F）----------
 insert into sys_menu values('2031', '阈值管理', '2030', '1', 'threshold', 'vqms/threshold/index', '', 'VqmsThreshold', 1, 0, 'C', '0', '0', 'vqms:threshold:list', 'edit', 'admin', sysdate(), '', null, '母线电压阈值管理');
@@ -71,3 +71,10 @@ insert into sys_role_menu values('2', '2033');
 insert into sys_role_menu values('2', '2034');
 insert into sys_role_menu values('2', '2035');
 insert into sys_role_menu values('2', '2036');
+
+-- ---------- 母线下拉支撑接口授权（D5 增补 2026-08-21：/vqms/vqms_busbar/list 供 5 个母线维度页面级联，各自挂 F 保证按页授权即可用） ----------
+insert into sys_menu values('2037', '母线选择-曲线', '2011', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2038', '母线选择-日报', '2001', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2039', '母线选择-月报', '2002', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2040', '母线选择-年报', '2003', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2041', '母线选择-阈值', '2031', '6', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:list', '#', 'admin', sysdate(), '', null, '');

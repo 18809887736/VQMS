@@ -23,6 +23,10 @@ public class VqmsBusbar implements Serializable
     /** 电压等级编码：0=500kV, 1=220kV, 2=66kV及以下(预留)，与字典 vqms_v_grade 严格对齐勿改 */
     private Integer vGrade;
 
+    /** Jackson 默认会把 getVGrade 序列化为 "vgrade"，前端契约是 vGrade（v5.0 §9.3） */
+    @com.fasterxml.jackson.annotation.JsonProperty("vGrade")
+    public Integer getVGrade() { return vGrade; }
+
     /** 所属母线组（逻辑 FK → vqms_busbar_group.group_num） */
     private Long groupNum;
 
@@ -53,7 +57,6 @@ public class VqmsBusbar implements Serializable
     public void setBusbarNum(Long busbarNum) { this.busbarNum = busbarNum; }
     public String getBusbarName() { return busbarName; }
     public void setBusbarName(String busbarName) { this.busbarName = busbarName; }
-    public Integer getVGrade() { return vGrade; }
     public void setVGrade(Integer vGrade) { this.vGrade = vGrade; }
     public Long getGroupNum() { return groupNum; }
     public void setGroupNum(Long groupNum) { this.groupNum = groupNum; }

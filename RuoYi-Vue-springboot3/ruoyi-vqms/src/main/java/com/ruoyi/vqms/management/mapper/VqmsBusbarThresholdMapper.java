@@ -1,6 +1,7 @@
 package com.ruoyi.vqms.management.mapper;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.vqms.management.domain.VqmsBusbarThreshold;
 
 /**
@@ -8,7 +9,7 @@ import com.ruoyi.vqms.management.domain.VqmsBusbarThreshold;
  */
 public interface VqmsBusbarThresholdMapper
 {
-    List<VqmsBusbarThreshold> selectList();
+    List<VqmsBusbarThreshold> selectList(@Param("busbarNum") Long busbarNum);
     VqmsBusbarThreshold selectById(Long thresholdId);
     VqmsBusbarThreshold selectByBusbarAndDate(Long busbarNum, String dateStr);
     int insert(VqmsBusbarThreshold entity);

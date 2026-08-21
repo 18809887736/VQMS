@@ -60,6 +60,13 @@
             <artifactId>ruoyi-vqms</artifactId>
         </dependency>
 
+        <!-- D5 起控制器验收测试（L0 perms 一致性 + L1 standalone MockMvc） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>

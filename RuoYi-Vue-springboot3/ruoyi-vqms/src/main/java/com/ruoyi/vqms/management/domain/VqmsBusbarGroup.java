@@ -46,6 +46,8 @@ public class VqmsBusbarGroup implements Serializable
     public void setGroupNum(Long groupNum) { this.groupNum = groupNum; }
     public String getGroupName() { return groupName; }
     public void setGroupName(String groupName) { this.groupName = groupName; }
+    /** Jackson 默认会把 getVGrade 序列化为 "vgrade"，前端契约是 vGrade（v5.0 §9.3） */
+    @com.fasterxml.jackson.annotation.JsonProperty("vGrade")
     public Integer getVGrade() { return vGrade; }
     public void setVGrade(Integer vGrade) { this.vGrade = vGrade; }
     public Long getMainIndicatorYcNum() { return mainIndicatorYcNum; }

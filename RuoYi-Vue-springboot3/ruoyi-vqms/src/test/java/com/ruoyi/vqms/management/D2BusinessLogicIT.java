@@ -47,10 +47,10 @@ class D2BusinessLogicIT
     private static final String DB_URL =
             "jdbc:mysql://10.0.0.9:13306/ry_vqms"
             + "?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8";
+    // 凭证不入库（CLAUDE.md Security）：密码走环境变量必填（2026-08-21 D5 修复：原 root 密码兜底值出库，历史值待轮换）
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD =
-            System.getenv().getOrDefault("MYSQL_ROOT_PASSWORD",
-                    "fa4b83b498817f5cb5a34287db0ce6e660713816ee2b1fae7ad1b45e11a9ed67268a97b4");
+            java.util.Objects.requireNonNull(System.getenv("MYSQL_ROOT_PASSWORD"), "缺少 MYSQL_ROOT_PASSWORD");
 
     @Configuration
     @MapperScan("com.ruoyi.vqms.management.mapper")
@@ -114,7 +114,7 @@ class D2BusinessLogicIT
             .filter(g -> g.getGroupName() != null && (g.getGroupName().startsWith("TEST_") || g.getGroupName().startsWith("FK_")))
             .forEach(g -> groupMapper.deleteByGroupNum(g.getGroupNum()));
 
-        List<VqmsBusbarThreshold> ths = thresholdMapper.selectList();
+        List<VqmsBusbarThreshold> ths = thresholdMapper.selectList(null);
         ths.stream()
             .filter(t -> t.getBusbarNum() != null && t.getBusbarNum() > 100)
             .forEach(t -> thresholdMapper.deleteById(t.getThresholdId()));

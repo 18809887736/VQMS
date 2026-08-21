@@ -2,15 +2,15 @@
 # pre-commit：只跑 L0 纯单测（测试方案 §6 交付检查点——首个 Java L0 测试存在即挂，随 D4 落地）
 # 仅当 ruoyi-vqms 的 Java/XML 有改动时才触发；*IT 集成测试不随默认 test 跑（surefire 命名约定）。
 # 启用：git config core.hooksPath .githooks
-staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^RuoYi-Vue-springboot3/ruoyi-vqms/.*\.(java|xml)$')
+staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^RuoYi-Vue-springboot3/ruoyi-(vqms|admin)/.*\.(java|xml)$')
 [ -z "$staged" ] && exit 0
 
 # 项目需 JDK17+，本机默认 JDK 1.8——ambient JAVA_HOME 不可信，一律强制本机 JDK17（VQMS_JDK17 可覆盖）
 JAVA_HOME="${VQMS_JDK17:-/c/environment/jdk-17.0.20+8}"
 export JAVA_HOME
 
-echo "[pre-commit] L0 测试（ruoyi-vqms）..."
-(cd RuoYi-Vue-springboot3 && mvn -q -pl ruoyi-vqms -am test) || {
+echo "[pre-commit] L0 测试（ruoyi-vqms + ruoyi-admin）..."
+(cd RuoYi-Vue-springboot3 && mvn -q -pl ruoyi-vqms,ruoyi-admin -am test) || {
     echo "[pre-commit] L0 测试未过，提交被拒（测试方案 §6 检查点）"
     exit 1
 }

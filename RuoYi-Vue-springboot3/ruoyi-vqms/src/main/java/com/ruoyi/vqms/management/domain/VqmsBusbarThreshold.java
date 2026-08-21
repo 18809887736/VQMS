@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.annotation.Excel;
 
 /**
  * VQMS 母线电压合格阈值（带生效区间）。
@@ -18,12 +19,15 @@ public class VqmsBusbarThreshold implements Serializable
     private Long thresholdId;
 
     /** 母线编号（逻辑 FK → vqms_busbar.busbar_num） */
+    @Excel(name = "母线编号")
     private Long busbarNum;
 
     /** 口径：AVC=控制达标率 / GB=国标±10% */
+    @Excel(name = "口径", readConverterExp = "AVC=AVC 控制达标率,GB=国标±10%")
     private String criterionType;
 
     /** AVC 容差(kV)：220kV=1.000, 500kV=1.500；GB 口径为空 */
+    @Excel(name = "容差(kV)")
     private BigDecimal toleranceV;
 
     /** plan_SV 废值策略：SKIP/COUNT_UNQUALIFIED/FALLBACK。⚠️旧模型遗留列，暂无消费方 */
@@ -31,10 +35,12 @@ public class VqmsBusbarThreshold implements Serializable
 
     /** 生效起始日（含） */
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "生效起始日", dateFormat = "yyyy-MM-dd")
     private Date effectiveFrom;
 
     /** 生效结束日（含），null=至今有效 */
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "生效结束日", dateFormat = "yyyy-MM-dd")
     private Date effectiveTo;
 
     /** 创建者 */

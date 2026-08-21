@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-**规划 + 前端骨架阶段。** RuoYi 脚手架已就位（`RuoYi-Vue-springboot3/` 后端、`RuoYi-Vue3/` 前端），VQMS 前端业务页面骨架已落地（`RuoYi-Vue3/src/views/vqms/` 下 7 个页面：curve / daily / monthly / yearly / avc-runtime / avc-regulation / threshold）；后端 `ruoyi-vqms` 业务模块尚未落地。后端代码落地后，在此补真实 build/test 命令。
+**规划 + 前端骨架 + 后端确定轨 D1~D3 阶段。** RuoYi 脚手架已就位（`RuoYi-Vue-springboot3/` 后端、`RuoYi-Vue3/` 前端），VQMS 前端业务页面骨架已落地（`RuoYi-Vue3/src/views/vqms/` 下 7 个页面：curve / daily / monthly / yearly / avc-runtime / avc-regulation / threshold）；后端 `ruoyi-vqms` 模块已落地 D1~D3（2026-08-21）：D1 source 只读层、D2 管理表 + 逻辑 FK、D3 时间对齐工具（报告见 `docs/测试/D1~D3_*.md`）。build/test：`JAVA_HOME=<JDK17> mvn -pl ruoyi-vqms -am test`（本机默认 JDK 1.8 须显式指 `/c/environment/jdk-17.0.20+8`；`*IT` 集成测试不随默认 `test` 跑，须 `-Dtest=xxxIT` 且 10.0.0.9 可达）。
 
 ### 权威文档与版本演进链
 
@@ -182,7 +182,7 @@ VQMS 考核功能以《东北区域电力并网运行管理实施细则》《东
 - **文档同步债**：v3.4 / `docs/外部DB/外部数据源.md` / 核心算法流程图 仍写旧 `average_SV` + `plan_SV` 模型，与草稿冲突——以草稿为准。
 - **500kV 母线数据缺失**：`busbar` / `busbar_threshold` / `yc_point_map` 均待现场补录。
 - **门控点（远方就地总已定号 2026-08-18）**：远方就地总 = **yx2003**（对端配置库现成派生点：OR(yx12 正母, yx23 副母)，1=远方/0=就地；warn_info obj_num=2003 事件佐证，见 `docs/外部DB/JS计算引擎说明.md`），种子已插、`gate_enabled=0` 待真实现场部署核对后置 1；AVC投退真实候选 = **yx1001**（`AVC_INFO.AVCStatusYxNum`）——⚠️ **合成占位 3009 与真实库撞号不同义**（真实 yx3009 = 四号机组下闭锁总信号，JS_DATA js109），真实现场核对后必须换号。**其余数据源点号已考据（2026-08-18，证据链与待核对项见 `docs/数据源头（草稿）.md` 定号一览）**：主母线号 yc3（对端 BUSBAR_GROUP.MainBarYcNum）、实时电压 yc8 东母 / yc14 西母（BUSBAR.realVYcNum）、总有功 yc216+yc316（GENERATOR.pYcNum，VQMS 求和）。**合成库点位已齐**（3009 投退 / 2003 远方就地总 / 501 免考 / 511·512 并网 / 521·522 退出原因，`tools/avc-data-gen/config/points.yaml`），联调置 `gate_enabled=1` 即可跑。
-- **后端落地**：`ruoyi-vqms` 模块、build/test 命令、真实数据验证均未开始（确定轨可立即推进 D1~D9，见 v5.0 §12.1；**D1 目标本周内（2026-08-23 前）启动**，Leo 2026-08-18 定）。
+- **后端落地**：✅ D1~D3 已交付（2026-08-21，source 只读层 / 管理表 + 逻辑 FK / 时间对齐工具，各带测试与报告）；D4~D9 未开始，下一个 = D4 格式校验三步闸门（`MinuteRounder.parseAndRound` 已备好第③步）。测试方案 §6 的「pre-commit hook 只跑 L0」交付检查点条件已成立（首个 L0 测试存在），随 D4 挂上。真实数据验证仍未做（等现场样本）。
 
 ## Security
 

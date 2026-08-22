@@ -34,16 +34,19 @@ def _cmd(t0, obj_num, text, realtime_v_kv=None, raw_warn_time=None):
                    warn_info_text=text, realtime_v_kv=realtime_v_kv)
 
 
-def _win_curve(t0, busbars, *, fast_pts, econ_pts, outside=(224, 222),
+def _win_curve(cfg, t0, *, fast_pts, econ_pts, outside=(224, 222),
                plan_sv=PLAN_SV_DISCARD, missing_main=()):
     """生成 [-2, T_econ+2] 窗口的双写曲线。
 
+    窗口布局读 config/thresholds.yaml（t_fast_min/t_econ_min）——2026-08-22 与 D7 锁定值
+    (t_fast=4, t_econ=5) 对齐（原 5/30 为拍板前旧口径，见测试方案 §前置 勘误）。
     fast_pts/econ_pts: list[(high, low)]，下标对应窗口内 minute_offset（fast 从1、econ 从 T_fast+1）。
     outside: 窗外余量 (high, low)。missing_main: 主母线(bn=0)缺失的 minute_offset 集合。
     返回 CurvePoint 列表（已双写）。
     """
-    t_fast = 5
-    t_econ = 30
+    busbars = cfg.thresholds["default_busbar_pair"]
+    t_fast = int(cfg.thresholds["t_fast_min"])
+    t_econ = int(cfg.thresholds["t_econ_min"])
     pts = []
     for m in range(-2, t_econ + 3):
         t = t0 + timedelta(minutes=m)
@@ -73,14 +76,14 @@ def _realtime_meta(cfg, t0, *, realtime_kv=234.25, busbar=0):
 
 
 # 通用 fast/econ 窗口数据（5 / 25 个点）——夹住 223.15：L≤223.15≤H
-_HOLD_FAST = [(224, 222), (224, 223), (225, 222), (224, 223), (224, 222)]  # L=222,H=225 夹
-_HOLD_ECON = [(224 + (i % 2), 222 + (i % 2)) for i in range(25)]           # L∈{222,223},H∈{224,225} 夹
+_HOLD_FAST = [(224, 222), (224, 223), (225, 222), (224, 223)]  # L=222,H=225 夹（fast 窗 [1..4] 4 分钟）
+_HOLD_ECON = [(224, 222)]                                     # L=222,H=224 夹（econ 窗 [5..5] 1 分钟）
 # 全低于目标（不夹，偏高不到位）：H 全 < 223.15
-_MISS_BELOW_FAST = [(222, 221)] * 5     # H=222 < 223.15 → 不夹
-_MISS_BELOW_ECON = [(222, 221)] * 25
+_MISS_BELOW_FAST = [(222, 221)] * 4     # H=222 < 223.15 → 不夹
+_MISS_BELOW_ECON = [(222, 221)]
 # 全高于目标（不夹，偏低不到位）：L 全 > 223.15
-_MISS_ABOVE_FAST = [(226, 225)] * 5     # L=225 > 223.15 → 不夹
-_MISS_ABOVE_ECON = [(226, 225)] * 25
+_MISS_ABOVE_FAST = [(226, 225)] * 4     # L=225 > 223.15 → 不夹
+_MISS_ABOVE_ECON = [(226, 225)]
 
 
 # ────────────────────────── S01-S04 四档组合 ──────────────────────────
@@ -90,7 +93,7 @@ class S01FastQualEconQual:
     id = "S01"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON)
         return ScenarioBundle(self.id, "快合+经合（目标值，夹住）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -103,7 +106,7 @@ class S02FastPenEconQual:
     id = "S02"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_MISS_BELOW_FAST, econ_pts=_HOLD_ECON)
         return ScenarioBundle(self.id, "快不合+经合（调得慢最终调到）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -116,7 +119,7 @@ class S03FastQualEconPen:
     id = "S03"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_MISS_BELOW_ECON)
         return ScenarioBundle(self.id, "快合+经不合（短期夹住长期漂走）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -129,7 +132,7 @@ class S04FastPenEconPen:
     id = "S04"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_MISS_BELOW_FAST, econ_pts=_MISS_BELOW_ECON)
         return ScenarioBundle(self.id, "两档都不合·非免考", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -146,7 +149,7 @@ class S05FastExemptEconPen:
     id = "S05"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_MISS_BELOW_FAST, econ_pts=_MISS_BELOW_ECON)
         # 阶跃在 t0+6（快速窗结束之后），保证快速窗 [1,5] 全程 yx501=1
         t_cut = t0 + timedelta(minutes=6)
@@ -163,7 +166,7 @@ class S06FastPenEconExempt:
     id = "S06"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_MISS_BELOW_FAST, econ_pts=_MISS_BELOW_ECON)
         t_cut = t0 + timedelta(minutes=6)   # 经济窗起始
         return ScenarioBundle(self.id, "两档都不合·快不免考+经免考（yx501 阶跃）", cfg.base_date,
@@ -178,7 +181,7 @@ class S07AllExempt:
     id = "S07"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_MISS_BELOW_FAST, econ_pts=_MISS_BELOW_ECON)
         return ScenarioBundle(self.id, "两档都不合·全免考（yx501 全程1）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -196,9 +199,9 @@ class S08LowBoundary:
     id = "S08"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        fast = [(226, 225)] * 5     # L=225, H=226，V_target=225 落 L 边界 → 合格
+        fast = [(226, 225)] * 4     # L=225, H=226，V_target=225 落 L 边界 → 合格
         econ = _MISS_ABOVE_ECON    # 漂高不夹
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=fast, econ_pts=econ)
         return ScenarioBundle(self.id, "偏低边界（L=V_target 测≤闭区间）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22500.")],
@@ -216,9 +219,9 @@ class S09IncrementUp:
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
         rt = 234.25
         v_target = 234.45  # rt + 0.2
-        hold_fast = [(235, 234)] * 5     # 234 ≤ 234.45 ≤ 235 夹
-        hold_econ = [(235, 234)] * 25
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        hold_fast = [(235, 234)] * 4     # 234 ≤ 234.45 ≤ 235 夹
+        hold_econ = [(235, 234)]
+        curve = _win_curve(cfg, t0,
                            fast_pts=hold_fast, econ_pts=hold_econ, outside=(235, 234))
         return ScenarioBundle(self.id, "增量加（2202@234.25→234.45kV）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:辽宁母线电压增量指令编码值处理,2202.",
@@ -235,9 +238,9 @@ class S10IncrementDown:
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
         rt = 234.25
         v_target = 234.05  # rt - 0.2
-        hold_fast = [(235, 234)] * 5     # 234 ≤ 234.05 ≤ 235 夹
-        hold_econ = [(235, 234)] * 25
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        hold_fast = [(235, 234)] * 4     # 234 ≤ 234.05 ≤ 235 夹
+        hold_econ = [(235, 234)]
+        curve = _win_curve(cfg, t0,
                            fast_pts=hold_fast, econ_pts=hold_econ, outside=(235, 234))
         return ScenarioBundle(self.id, "增量减（1202@234.25→234.05kV）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:辽宁母线电压增量指令编码值处理,1202.",
@@ -255,7 +258,7 @@ class S11IncrementNoRealtimeV:
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
         p = cfg.points
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON)
         # 故意不写 realtime_v_busbar0/1（缺实时电压）
         yc = [
@@ -274,7 +277,7 @@ class S12DecodeFail:
     id = "S12"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON)
         return ScenarioBundle(self.id, "解码失败（,abc.）→跳过", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,abc.")],
@@ -289,7 +292,7 @@ class S13PartialMissingMinutes:
     id = "S13"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON, missing_main={3})
         return ScenarioBundle(self.id, "部分缺分钟（min3 主母线缺，不影响）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -302,8 +305,8 @@ class S14WholeWindowMissing:
     id = "S14"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        fast_missing = {1, 2, 3, 4, 5}
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        fast_missing = {1, 2, 3, 4}   # 快速窗 [1..t_fast=4] 整档全缺（对齐后 econ 窗=[5..5] 不受影响）
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON, missing_main=fast_missing)
         return ScenarioBundle(self.id, "整窗全缺（快速窗主母线全缺→该档剔除）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -316,7 +319,7 @@ class S15PlanSvDiscard:
     id = "S15"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON, plan_sv=PLAN_SV_DISCARD)
         return ScenarioBundle(self.id, "plan_SV=10245 废值干扰（算法应不读）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -329,8 +332,8 @@ class S16IntervalInverted:
     id = "S16"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        inverted_fast = [(224, 225)] * 5   # high=224 < low=225 → L=225 > H=224 异常
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        inverted_fast = [(224, 225)] * 4   # high=224 < low=225 → L=225 > H=224 异常（fast 窗 4 分钟全反转）
+        curve = _win_curve(cfg, t0,
                            fast_pts=inverted_fast, econ_pts=_HOLD_ECON)
         return ScenarioBundle(self.id, "区间 L>H 异常（快速窗反转→无效）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.")],
@@ -347,7 +350,7 @@ class S17TwoCommandsSplit:
     id = "S17"
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON)
         # obj_num=0 夹住；obj_num=1 目标更高（22500→225）不夹（H 全 224）
         return ScenarioBundle(self.id, "双指令分通道（obj0夹/obj1不夹）", cfg.base_date,
@@ -371,7 +374,7 @@ class S18RoundDown29:
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
         raw = at_minute(cfg.base_date, hour=10, minute=0, second=29, microsecond=447000)
         assert round_to_minute(raw) == t0
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON)
         return ScenarioBundle(self.id, "亚秒:29舍（warn_time 10:00:29→t0=10:00）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.", raw_warn_time=raw)],
@@ -386,7 +389,7 @@ class S19RoundUp30:
         t0 = at_minute(cfg.base_date, hour=10, minute=1)
         raw = at_minute(cfg.base_date, hour=10, minute=0, second=30, microsecond=447000)
         assert round_to_minute(raw) == t0
-        curve = _win_curve(t0, cfg.thresholds["default_busbar_pair"],
+        curve = _win_curve(cfg, t0,
                            fast_pts=_HOLD_FAST, econ_pts=_HOLD_ECON)
         return ScenarioBundle(self.id, "亚秒:30进（warn_time 10:00:30→t0=10:01）", cfg.base_date,
             commands=[_cmd(t0, 0, "收到远方遥调执行指令:主省220KV目标值,22315.", raw_warn_time=raw)],

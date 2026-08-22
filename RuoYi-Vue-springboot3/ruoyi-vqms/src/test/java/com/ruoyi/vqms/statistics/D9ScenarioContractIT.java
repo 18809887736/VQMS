@@ -44,14 +44,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * QUALIFIED，替换 S1 后本 IT 升级为全量 oracle 比对）。
  *
  * <h3>参数口径</h3>
- * {@link JudgeParams} 取<b>生成器场景布局 (t_fast=5, t_econ=30)</b>——manifest 期望按此布局
- * 排布（_win_curve：fast 分钟 1-5、econ 分钟 6-30）。与生产整定种子 (4,5) 的对齐属真实数据
- * 回放前置项（测试方案已登记），届时重灌数据 + 重算 manifest 后同步。
+ * {@link JudgeParams} 取<b>生产锁定参数 (t_fast=4, t_econ=5)</b>，与 D7 `vqms_judge_param`
+ * 种子/CHECK 一致；生成器窗口布局已于 2026-08-22 对齐（thresholds.yaml + _win_curve 原为
+ * 拍板前旧口径 5/30，Leo D9 评审抓出后重灌 26 场景数据 + 重算 manifest——见 D9 报告 §八）。
  */
 class D9ScenarioContractIT
 {
-    /** 生成器场景布局口径（见类注——非生产种子 4/5） */
-    private static final JudgeParams GENERATOR_PARAMS = new JudgeParams(5, 30);
+    /** 生产锁定参数（D7 vqms_judge_param 种子：t_fast=4 可整定默认 / t_econ=5 写死） */
+    private static final JudgeParams PRODUCTION_PARAMS = new JudgeParams(4, 5);
 
     private static final String DB_URL =
             "jdbc:mysql://10.0.0.9:3306/qheatavchisdb"
@@ -144,7 +144,7 @@ class D9ScenarioContractIT
             }
         }
         List<MinuteCurve> curves = new ArrayList<>();
-        for (int offset = 1; offset <= GENERATOR_PARAMS.tEcon(); offset++)
+        for (int offset = 1; offset <= PRODUCTION_PARAMS.tEcon(); offset++)
         {
             for (HisCurveSv row : curvesByMinute.getOrDefault(t0.plusMinutes(offset), List.of()))
             {
@@ -207,12 +207,12 @@ class D9ScenarioContractIT
         Map<String, RegulationOutcome> firstRun = new HashMap<>();
         for (JudgeInput in : inputs)
         {
-            RegulationOutcome o = judge.judge(in.cmd(), in.curves(), GENERATOR_PARAMS);
+            RegulationOutcome o = judge.judge(in.cmd(), in.curves(), PRODUCTION_PARAMS);
             firstRun.put(in.cmd().warnTime() + "|" + in.cmd().objNum(), o);
         }
         for (JudgeInput in : inputs)
         {
-            RegulationOutcome again = judge.judge(in.cmd(), in.curves(), GENERATOR_PARAMS);
+            RegulationOutcome again = judge.judge(in.cmd(), in.curves(), PRODUCTION_PARAMS);
             assertEquals(firstRun.get(in.cmd().warnTime() + "|" + in.cmd().objNum()), again,
                     "确定性：同输入两次判定须相等（禁随机）");
         }
@@ -243,8 +243,8 @@ class D9ScenarioContractIT
             assertTrue(j.fast().isEmpty(), id + " 无效档 VERDICT 必空（构造期不变式）");
             assertTrue(j.econ().isPresent(), id + " 经济档正常出结论（stub 占位）");
         }
-        // completeness 如实上报（布局 [1..30]）：S14 缺分钟 1-5 → 25/30；S16 全在 → 30/30
-        assertEquals(25.0 / 30.0, judged.get("S14").completeness(), 1e-9);
+        // completeness 如实上报（布局 [1..5]）：S14 快速窗分钟 1-4 整档缺 → 1/5；S16 全在 → 5/5
+        assertEquals(0.2, judged.get("S14").completeness(), 1e-9);
         assertEquals(1.0, judged.get("S16").completeness(), 1e-9);
     }
 
@@ -254,7 +254,7 @@ class D9ScenarioContractIT
         RegulationOutcome.Judged j = runJudgedByScenario().get("S13");
         assertNotNull(j);
         assertTrue(j.invalidTiers().isEmpty(), "部分缺不走 invalidTiers");
-        assertEquals(29.0 / 30.0, j.completeness(), 1e-9, "缺分钟 3 → 29/30 如实上报");
+        assertEquals(0.8, j.completeness(), 1e-9, "缺分钟 3 → 4/5 如实上报");
     }
 
     @Test
@@ -287,7 +287,7 @@ class D9ScenarioContractIT
         Set<Long> channels = new java.util.HashSet<>();
         for (JudgeInput in : inputs)
         {
-            RegulationOutcome o = judge.judge(in.cmd(), in.curves(), GENERATOR_PARAMS);
+            RegulationOutcome o = judge.judge(in.cmd(), in.curves(), PRODUCTION_PARAMS);
             RegulationOutcome.Judged j = assertInstanceOf(RegulationOutcome.Judged.class, o,
                     "S17 两指令均解码成功");
             channels.add(in.cmd().objNum());
@@ -323,7 +323,7 @@ class D9ScenarioContractIT
         Map<String, String> dayById = scenarioDay();
         for (JudgeInput in : allInputs(allCommands()))
         {
-            out.put(scenarioIdOf(in, dayById), judge.judge(in.cmd(), in.curves(), GENERATOR_PARAMS));
+            out.put(scenarioIdOf(in, dayById), judge.judge(in.cmd(), in.curves(), PRODUCTION_PARAMS));
         }
         return out;
     }

@@ -10,6 +10,7 @@ COPY ruoyi-system/pom.xml ruoyi-system/pom.xml
 COPY ruoyi-quartz/pom.xml ruoyi-quartz/pom.xml
 COPY ruoyi-generator/pom.xml ruoyi-generator/pom.xml
 COPY ruoyi-admin/pom.xml ruoyi-admin/pom.xml
+COPY ruoyi-vqms/pom.xml ruoyi-vqms/pom.xml
 RUN mvn -q -B dependency:go-offline
 
 COPY . .

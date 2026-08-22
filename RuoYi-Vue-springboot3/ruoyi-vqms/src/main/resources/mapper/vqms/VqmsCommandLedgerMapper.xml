@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsCommandLedgerMapper">
+    <resultMap type="com.ruoyi.vqms.management.domain.VqmsCommandLedger" id="VqmsCommandLedgerResult">
+        <id     property="id"          column="id"/>
+        <result property="warnTime"    column="warn_time"/>
+        <result property="millisecond" column="millisecond"/>
+        <result property="warnType"    column="warn_type"/>
+        <result property="objNum"      column="obj_num"/>
+        <result property="warnContent" column="warn_content"/>
+        <result property="fetchedAt"   column="fetched_at"/>
+    </resultMap>
+
+    <!-- 摘录列不含生成列 millisecond_uk/obj_num_uk（DB 自算）与 fetched_at（DB default）；
+         insert ignore + uk_cmd(warn_time, millisecond_uk, obj_num_uk) = 幂等，冲突静默跳过 -->
+    <insert id="insertIgnoreBatch">
+        insert ignore into vqms_command_ledger
+            (warn_time, millisecond, warn_type, obj_num, warn_content)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.warnTime}, #{item.millisecond}, #{item.warnType}, #{item.objNum}, #{item.warnContent})
+        </foreach>
+    </insert>
+
+    <select id="countAll" resultType="long">
+        select count(*) from vqms_command_ledger
+    </select>
+
+    <sql id="selectLedgerVo">
+        select id, warn_time, millisecond, warn_type, obj_num, warn_content, fetched_at
+        from vqms_command_ledger
+    </sql>
+
+    <select id="selectByWarnTimeRange" resultMap="VqmsCommandLedgerResult">
+        <include refid="selectLedgerVo"/>
+        where warn_time between #{startTime} and #{endTime}
+        order by warn_time, millisecond, obj_num
+    </select>
+
+    <delete id="deleteByWarnTimeRange">
+        delete from vqms_command_ledger
+        where warn_time between #{startTime} and #{endTime}
+    </delete>
+</mapper>

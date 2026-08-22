@@ -199,17 +199,25 @@ insert into vqms_judge_param (param_key, param_value, name, description, value_m
 --    搁置期计数契约（§8.6「原始事实只记不判」）的落库目标：外部源 warn_info 电压指令（warn_type=5）的
 --    原始字段只增摘录，不含任何判定/解码结论——undecodable 标志、窗口缺分钟数随搁置轨解封后从本表原文
 --    + 外部源曲线重算。存储切分铁律的唯一有界例外：仅此一张原始摘录表、只增、~288 行/天（见 v4.1 §4/§6.2.6）。
+--    幂等（2026-08-22 D8）：MySQL 唯一键视 NULL 互不相同——millisecond/obj_num 可空列直接进 uk 拦不住
+--    NULL 重复行；经生成列把 NULL 归一（'' / -1）后进 uk，重复抓取由 DB 层结构性拦截（insert ignore 即幂等），
+--    无需应用层 check-then-insert（无 TOCTOU 竞态）。-1 不与真实对象编号撞（现场编号恒正）。
+--    millisecond/millisecond_uk 与源表同宽 varchar(255)（D8 对抗验证吸收）：源列无约束（save_time varchar(255)
+--    同类病灶有先例），收窄会在 insert ignore 下把超宽脏值静默截断、截断值再进 uk 致假碰撞丢行——违背
+--    「忠实原文摘录」定位；uk 键长 32*4+255*4+8=1156 字节 < 3072 InnoDB 上限，无代价。
 drop table if exists vqms_command_ledger;
 create table vqms_command_ledger (
-  id           bigint(20)    not null auto_increment comment '主键',
-  warn_time    varchar(32)   not null                comment '指令时间原文（外部源 warn_info.warn_time，varchar 原样保留，格式校验在读取层）',
-  millisecond  varchar(8)    default null            comment '毫秒原文（warn_info.millisecond）',
-  warn_type    int           not null                comment '类型；电压指令=5（本账只收指令；全量告警是否入账随 §14-8 退出原因来源定）',
-  obj_num      bigint(20)    default null            comment '对象编号（现场整定；非 VQMS 管理表引用，不参与逻辑 FK 校验）',
-  warn_content varchar(255)  default null            comment '指令文本原文（目标值/增量值编码在此文本内；解码随搁置轨 judge 实现）',
-  fetched_at   datetime      default current_timestamp comment '抓取入库时间',
+  id              bigint(20)    not null auto_increment comment '主键',
+  warn_time       varchar(32)   not null                comment '指令时间原文（外部源 warn_info.warn_time，varchar 原样保留，格式校验在读取层）',
+  millisecond     varchar(255)  default null            comment '毫秒原文（warn_info.millisecond 原样摘录，与源同宽防截断失真）',
+  warn_type       int           not null                comment '类型；电压指令=5（本账只收指令；全量告警是否入账随 §14-8 退出原因来源定）',
+  obj_num         bigint(20)    default null            comment '对象编号（现场整定；非 VQMS 管理表引用，不参与逻辑 FK 校验）',
+  warn_content    varchar(255)  default null            comment '指令文本原文（目标值/增量值编码在此文本内；解码随搁置轨 judge 实现）',
+  fetched_at      datetime      default current_timestamp comment '抓取入库时间',
+  millisecond_uk  varchar(255)  generated always as (coalesce(millisecond, '')) stored comment 'uk 键列：millisecond NULL 归一空串（应用不读写）',
+  obj_num_uk      bigint(20)    generated always as (coalesce(obj_num, -1)) stored comment 'uk 键列：obj_num NULL 归一 -1（应用不读写）',
   primary key (id),
-  unique key uk_cmd (warn_time, millisecond, obj_num)
+  unique key uk_cmd (warn_time, millisecond_uk, obj_num_uk)
 ) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS AVC 指令流水账（原始事实，只增）';
 
 

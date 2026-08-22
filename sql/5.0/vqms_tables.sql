@@ -152,17 +152,22 @@ INSERT INTO `vqms_judge_param` (`param_key`, `param_value`, `name`, `description
 -- 6.2.6 vqms_command_ledger（AVC 指令流水账，2026-08-17 新增）
 --   搁置期计数契约（§8.6「原始事实只记不判」）的落库目标——warn_info 电压指令（warn_type=5）原始字段只增摘录，
 --   不含判定/解码结论。存储切分铁律唯一有界例外：仅此一张原始摘录表、只增不改，~288 行/天。
+--   幂等（2026-08-22 D8）：可空键列经生成列 NULL 归一后进 uk（MySQL 唯一键拦不住 NULL 重复），
+--   insert ignore 即幂等、无应用层 check-then-insert 竞态。millisecond/millisecond_uk 与源同宽 varchar(255)
+--   （防 insert ignore 下超宽脏值静默截断失真——D8 对抗验证吸收）。
 -- ============================================================
 CREATE TABLE `vqms_command_ledger` (
-  `id`           bigint(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `warn_time`    varchar(32)  NOT NULL                COMMENT '指令时间原文（对齐外部源 warn_info.warn_time，varchar 原样保留，格式校验在读取层）',
-  `millisecond`  varchar(8)   DEFAULT NULL            COMMENT '毫秒原文（warn_info.millisecond）',
-  `warn_type`    int          NOT NULL                COMMENT '类型；电压指令=5（本账只收指令；全量告警是否入账随退出原因来源定）',
-  `obj_num`      bigint(20)   DEFAULT NULL            COMMENT '对象编号（现场整定；非 VQMS 管理表引用，不参与逻辑 FK 校验）',
-  `warn_content` varchar(255) DEFAULT NULL            COMMENT '指令文本原文（目标值/增量值编码在此文本内；解码随搁置轨 judge 实现）',
-  `fetched_at`   datetime     DEFAULT CURRENT_TIMESTAMP COMMENT '抓取入库时间',
+  `id`              bigint(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `warn_time`       varchar(32)  NOT NULL                COMMENT '指令时间原文（对齐外部源 warn_info.warn_time，varchar 原样保留，格式校验在读取层）',
+  `millisecond`     varchar(255) DEFAULT NULL            COMMENT '毫秒原文（warn_info.millisecond 原样摘录，与源同宽防截断失真）',
+  `warn_type`       int          NOT NULL                COMMENT '类型；电压指令=5（本账只收指令；全量告警是否入账随退出原因来源定）',
+  `obj_num`         bigint(20)   DEFAULT NULL            COMMENT '对象编号（现场整定；非 VQMS 管理表引用，不参与逻辑 FK 校验）',
+  `warn_content`    varchar(255) DEFAULT NULL            COMMENT '指令文本原文（目标值/增量值编码在此文本内；解码随搁置轨 judge 实现）',
+  `fetched_at`      datetime     DEFAULT CURRENT_TIMESTAMP COMMENT '抓取入库时间',
+  `millisecond_uk`  varchar(255) GENERATED ALWAYS AS (coalesce(`millisecond`, '')) STORED COMMENT 'uk 键列：millisecond NULL 归一空串（应用不读写）',
+  `obj_num_uk`      bigint(20)   GENERATED ALWAYS AS (coalesce(`obj_num`, -1)) STORED COMMENT 'uk 键列：obj_num NULL 归一 -1（应用不读写）',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_cmd` (`warn_time`, `millisecond`, `obj_num`)
+  UNIQUE KEY `uk_cmd` (`warn_time`, `millisecond_uk`, `obj_num_uk`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='VQMS AVC 指令流水账（原始事实，只增）';
 
 -- 无种子数据：流水由 source 层抓取填充（筛 warn_type=5），幂等（uk 冲突跳过）。

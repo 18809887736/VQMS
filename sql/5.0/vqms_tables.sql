@@ -171,3 +171,28 @@ CREATE TABLE `vqms_command_ledger` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='VQMS AVC 指令流水账（原始事实，只增）';
 
 -- 无种子数据：流水由 source 层抓取填充（筛 warn_type=5），幂等（uk 冲突跳过）。
+
+-- ============================================================
+-- 8.7 vqms_policy_param（数据不可用策略参数表，2026-08-22 D9 骨架）
+--   甲/乙/丙/丁 = 同一策略评估纯函数的四组配置；换策略 = 改本表几行、代码不动。
+--   ⚠️ 选套值留空（Leo 2026-08-18 拍板）：整表零种子行、不预设处置值。
+--   约定键：undecodable_mode / invalid_tier_mode / partial_missing_mode ∈
+--     {COUNT_NORMAL, EXCLUDE_REPORTED, COUNT_UNQUALIFIED, PEND_MARKED}；
+--     partial_missing_threshold_pct = 整数百分比（EXCLUDE_REPORTED 时必填，乙档建议 50）。
+--   无 CHECK 钉值（无政策值可钉）；无 CRUD UI（D9 范围拍板）。
+-- ============================================================
+CREATE TABLE `vqms_policy_param` (
+  `param_id`     bigint(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `param_key`    varchar(64)  NOT NULL                COMMENT '参数键（约定键见节注）',
+  `param_value`  varchar(255) DEFAULT NULL            COMMENT '参数值（字符串枚举/整数文本；选套前整表留空）',
+  `name`         varchar(64)  NOT NULL                COMMENT '参数名称',
+  `description`  varchar(255) DEFAULT NULL            COMMENT '说明',
+  `create_by`    varchar(64)  DEFAULT ''              COMMENT '创建者',
+  `create_time`  datetime     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by`    varchar(64)  DEFAULT ''              COMMENT '更新者',
+  `update_time`  datetime     DEFAULT NULL            COMMENT '更新时间',
+  PRIMARY KEY (`param_id`),
+  UNIQUE KEY `uk_policy_key` (`param_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='VQMS 数据不可用策略参数表（D9 骨架，选套留空）';
+
+-- 无种子数据：选套值留空待政策拍板（写入即生效）。

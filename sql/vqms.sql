@@ -169,7 +169,17 @@ create table vqms_judge_param (
   update_time  datetime     default current_timestamp on update current_timestamp comment '更新时间',
   remark       varchar(255) default null            comment '备注',
   primary key (param_id),
-  unique key uk_param_key (param_key)
+  unique key uk_param_key (param_key),
+  -- 值域/锁定结构性下沉（D7，测试方案 §4.6 两段断言之 DB 段；Service 层另留友好报错）：
+  -- ① 行本地值域；② 锁定行固定值——t_econ=5 写死、分档阈值 1/5 为附件6 政策值，旁路直改被拦；
+  -- 跨行 t_fast<t_econ 由 ①(t_fast∈[1,4]) + ②(t_econ 钉 5) 传导等价保证（CHECK 行本地写不了跨行）
+  constraint ck_value_range check (param_value between value_min and value_max),
+  constraint ck_locked_rows check (
+    (param_key = 't_econ'              and param_value = 5)
+    or (param_key = 'tier_threshold_fast' and param_value = 1)
+    or (param_key = 'tier_threshold_econ' and param_value = 5)
+    or (param_key = 't_fast')
+  )
 ) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 判定整定参数';
 
 -- 初始值（Leo 2026-08-14 定）：t_fast∈[1,5) 整数自由整定、默认建议 4；t_econ=5 写死锁定；

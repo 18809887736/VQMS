@@ -66,7 +66,8 @@ class D5MenuIT
                 { "2011", "vqms:curve:list", "vqms/curve/index" },
                 { "2021", "vqms:avc:runtime:list", "vqms/avc-runtime/index" },
                 { "2022", "vqms:avc:regulation:list", "vqms/avc-regulation/index" },
-                { "2031", "vqms:threshold:list", "vqms/threshold/index" } };
+                { "2031", "vqms:threshold:list", "vqms/threshold/index" },
+                { "2042", "vqms:judgeparam:list", "vqms/judgeparam/index" } };
         for (String[] row : expected)
         {
             try (Statement st = connection.createStatement();
@@ -102,7 +103,7 @@ class D5MenuIT
                 Assertions.assertTrue(Files.exists(vue), "component 不存在: " + component + " -> " + vue);
                 checked++;
             }
-            Assertions.assertEquals(7, checked, "应有 7 个 C 菜单");
+            Assertions.assertEquals(8, checked, "应有 8 个 C 菜单（7 页 + D7 判定参数）");
         }
     }
 
@@ -112,7 +113,8 @@ class D5MenuIT
         String[] expected = { "vqms:daily:export", "vqms:monthly:export", "vqms:yearly:export",
                 "vqms:avc:runtime:export", "vqms:avc:regulation:export",
                 "vqms:threshold:query", "vqms:threshold:add", "vqms:threshold:edit",
-                "vqms:threshold:remove", "vqms:threshold:export", "vqms:vqms_busbar:list" };
+                "vqms:threshold:remove", "vqms:threshold:export", "vqms:vqms_busbar:list",
+                "vqms:judgeparam:add", "vqms:judgeparam:edit", "vqms:judgeparam:remove" };
         for (String perm : expected)
         {
             try (Statement st = connection.createStatement();

@@ -83,3 +83,13 @@ insert into sys_role_menu values('2', '2038');
 insert into sys_role_menu values('2', '2039');
 insert into sys_role_menu values('2', '2040');
 insert into sys_role_menu values('2', '2041');
+
+-- ---------- 判定参数（D7 增补 2026-08-22：§6.2.5 / §10.1） ----------
+insert into sys_menu values('2042', '判定参数', '2030', '2', 'judgeparam', 'vqms/judgeparam/index', '', 'VqmsJudgeParam', 1, 0, 'C', '0', '0', 'vqms:judgeparam:list', 'edit', 'admin', sysdate(), '', null, '判定整定参数管理（t_fast 整定 / 锁定行）');
+insert into sys_menu values('2043', '判定参数新增', '2042', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:judgeparam:add', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2044', '判定参数修改', '2042', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:judgeparam:edit', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2045', '判定参数删除', '2042', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:judgeparam:remove', '#', 'admin', sysdate(), '', null, '');
+insert into sys_role_menu values('2', '2042');
+insert into sys_role_menu values('2', '2043');
+insert into sys_role_menu values('2', '2044');
+insert into sys_role_menu values('2', '2045');

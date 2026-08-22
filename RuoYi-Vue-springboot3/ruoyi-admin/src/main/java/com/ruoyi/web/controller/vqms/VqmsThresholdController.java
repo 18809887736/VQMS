@@ -33,10 +33,10 @@ public class VqmsThresholdController extends BaseController
 
     @PreAuthorize("@ss.hasPermi('vqms:threshold:list')")
     @GetMapping("/list")
-    public TableDataInfo list(Long busbarNum)
+    public TableDataInfo list(Long busbarNum, Integer vGrade)
     {
         startPage();
-        List<VqmsBusbarThreshold> list = thresholdService.selectList(busbarNum);
+        List<VqmsBusbarThreshold> list = thresholdService.selectList(busbarNum, vGrade);
         return getDataTable(list);
     }
 
@@ -81,7 +81,7 @@ public class VqmsThresholdController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response)
     {
-        List<VqmsBusbarThreshold> list = thresholdService.selectList(null);
+        List<VqmsBusbarThreshold> list = thresholdService.selectList(null, null);
         ExcelUtil<VqmsBusbarThreshold> util = new ExcelUtil<>(VqmsBusbarThreshold.class);
         util.exportExcel(response, list, "母线电压阈值");
     }

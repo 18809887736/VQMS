@@ -86,6 +86,21 @@ class D5PermsConsistencyTest
         }
     }
 
+    /** §9.3/§4.9 反向断言：avc 两页为厂级口径，不得有电压等级筛选 */
+    @Test
+    void assert_avc两页无电压等级筛选() throws Exception
+    {
+        for (String page : new String[] { "avc-runtime", "avc-regulation" })
+        {
+            Path vue = Paths.get("..", "..", "RuoYi-Vue3", "src", "views", "vqms", page, "index.vue")
+                    .toAbsolutePath().normalize();
+            Assertions.assertTrue(Files.exists(vue), "页面不存在: " + page);
+            String content = Files.readString(vue);
+            Assertions.assertFalse(content.contains("vqms_v_grade") || content.contains("vGrade"),
+                    page + " 为厂级口径，不应出现电压等级筛选（§9.3）");
+        }
+    }
+
     private static Set<String> controllerPerms()
     {
         Set<String> perms = new HashSet<>();

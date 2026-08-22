@@ -6,8 +6,10 @@
           <el-option v-for="dict in vqms_v_grade" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
-      <el-form-item label="母线编号" prop="busbarNum">
-        <el-input v-model="queryParams.busbarNum" placeholder="母线编号" clearable style="width: 200px" @keyup.enter="handleQuery" />
+      <el-form-item label="母线" prop="busbarNum">
+        <el-select v-model="queryParams.busbarNum" placeholder="母线" clearable filterable style="width: 200px">
+          <el-option v-for="b in busbarOptions" :key="b.busbarNum" :label="`${b.busbarName} (${b.busbarNum})`" :value="b.busbarNum" />
+        </el-select>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
@@ -35,6 +37,11 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="ID" prop="thresholdId" width="80" />
       <el-table-column label="母线编号" prop="busbarNum" width="100" />
+      <el-table-column label="电压等级" prop="vGrade" width="100">
+        <template #default="scope">
+          <dict-tag :options="vqms_v_grade" :value="scope.row.vGrade" />
+        </template>
+      </el-table-column>
       <el-table-column label="口径" prop="criterionType" width="140">
         <template #default="scope">
           <span>{{ scope.row.criterionType === 'AVC' ? 'AVC 控制达标率' : scope.row.criterionType === 'GB' ? '国标±10%' : scope.row.criterionType }}</span>
@@ -69,8 +76,10 @@
 
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
       <el-form ref="thresholdRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="母线编号" prop="busbarNum">
-          <el-input v-model="form.busbarNum" placeholder="请输入母线编号" />
+        <el-form-item label="母线" prop="busbarNum">
+          <el-select v-model="form.busbarNum" placeholder="请选择母线" filterable>
+            <el-option v-for="b in busbarList" :key="b.busbarNum" :label="`${b.busbarName} (${b.busbarNum})`" :value="b.busbarNum" />
+          </el-select>
         </el-form-item>
         <el-form-item label="口径" prop="criterionType">
           <el-select v-model="form.criterionType" placeholder="请选择口径">
@@ -98,9 +107,25 @@
 
 <script setup name="VqmsThreshold">
 import { listThreshold, getThreshold, addThreshold, updateThreshold, delThreshold } from '@/api/vqms/threshold'
+import { listBusbar } from '@/api/vqms/busbar'
 
 const { proxy } = getCurrentInstance()
 const { vqms_v_grade } = proxy.useDict('vqms_v_grade')
+
+// 母线下拉走后端 /vqms/vqms_busbar/list；类型归一到字符串与字典编码对齐
+const busbarList = ref([])
+const busbarOptions = computed(() =>
+  queryParams.value.vGrade ? busbarList.value.filter(b => b.vGrade === queryParams.value.vGrade) : busbarList.value
+)
+onMounted(() => {
+  listBusbar().then(response => {
+    busbarList.value = (response.rows || []).map(b => ({
+      busbarNum: String(b.busbarNum),
+      busbarName: b.busbarName,
+      vGrade: b.vGrade == null ? undefined : String(b.vGrade)
+    }))
+  })
+})
 
 const dataList = ref([])
 const open = ref(false)

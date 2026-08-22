@@ -60,6 +60,14 @@ public class VqmsBusbarThreshold implements Serializable
     /** 备注 */
     private String remark;
 
+    /** 电压等级（join vqms_busbar 输出，非本表列；§9.3 行须带 vGrade） */
+    private Integer vGrade;
+
+    /** Jackson 默认会把 getVGrade 序列化为 "vgrade"，前端契约是 vGrade（v5.0 §9.3） */
+    @com.fasterxml.jackson.annotation.JsonProperty("vGrade")
+    public Integer getVGrade() { return vGrade; }
+    public void setVGrade(Integer vGrade) { this.vGrade = vGrade; }
+
     public Long getThresholdId() { return thresholdId; }
     public void setThresholdId(Long thresholdId) { this.thresholdId = thresholdId; }
     public Long getBusbarNum() { return busbarNum; }

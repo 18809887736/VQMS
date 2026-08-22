@@ -114,7 +114,7 @@ class D2BusinessLogicIT
             .filter(g -> g.getGroupName() != null && (g.getGroupName().startsWith("TEST_") || g.getGroupName().startsWith("FK_")))
             .forEach(g -> groupMapper.deleteByGroupNum(g.getGroupNum()));
 
-        List<VqmsBusbarThreshold> ths = thresholdMapper.selectList(null);
+        List<VqmsBusbarThreshold> ths = thresholdMapper.selectList(null, null);
         ths.stream()
             .filter(t -> t.getBusbarNum() != null && t.getBusbarNum() > 100)
             .forEach(t -> thresholdMapper.deleteById(t.getThresholdId()));

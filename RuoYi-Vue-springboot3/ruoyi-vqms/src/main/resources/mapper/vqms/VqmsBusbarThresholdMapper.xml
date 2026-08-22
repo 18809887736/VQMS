@@ -15,44 +15,51 @@
         <result property="updateBy"        column="update_by"/>
         <result property="updateTime"      column="update_time"/>
         <result property="remark"          column="remark"/>
+        <result property="vGrade"          column="v_grade"/>
     </resultMap>
 
+    <!-- vGrade 来自 join vqms_busbar（§9.3 行须带 vGrade；500kV 母线缺失时为 null） -->
     <sql id="selectBusbarThresholdVo">
-        select threshold_id, busbar_num, criterion_type, tolerance_v,
-               plan_sv_invalid_policy, effective_from, effective_to,
-               create_by, create_time, update_by, update_time, remark
-        from vqms_busbar_threshold
+        select t.threshold_id, t.busbar_num, t.criterion_type, t.tolerance_v,
+               t.plan_sv_invalid_policy, t.effective_from, t.effective_to,
+               t.create_by, t.create_time, t.update_by, t.update_time, t.remark,
+               b.v_grade
+        from vqms_busbar_threshold t
+        left join vqms_busbar b on t.busbar_num = b.busbar_num
     </sql>
 
     <select id="selectList" resultMap="VqmsBusbarThresholdResult">
         <include refid="selectBusbarThresholdVo"/>
         <where>
             <if test="busbarNum != null">
-                and busbar_num = #{busbarNum}
+                and t.busbar_num = #{busbarNum}
+            </if>
+            <if test="vGrade != null">
+                and b.v_grade = #{vGrade}
             </if>
         </where>
-        order by busbar_num, effective_from desc
+        order by t.busbar_num, t.effective_from desc
     </select>
 
     <select id="selectById" resultMap="VqmsBusbarThresholdResult">
         <include refid="selectBusbarThresholdVo"/>
-        where threshold_id = #{thresholdId}
+        where t.threshold_id = #{thresholdId}
     </select>
 
     <!-- 按 busbar + 日期找当前生效区间阈值 -->
     <select id="selectByBusbarAndDate" resultMap="VqmsBusbarThresholdResult">
         <include refid="selectBusbarThresholdVo"/>
-        where busbar_num = #{busbarNum}
-          and effective_from &lt;= #{dateStr}
-          and (effective_to is null or effective_to &gt;= #{dateStr})
+        where t.busbar_num = #{busbarNum}
+          and t.effective_from &lt;= #{dateStr}
+          and (t.effective_to is null or t.effective_to &gt;= #{dateStr})
         limit 1
     </select>
 
     <select id="selectEffectiveByBusbarNum" resultMap="VqmsBusbarThresholdResult">
         <include refid="selectBusbarThresholdVo"/>
-        where busbar_num = #{busbarNum}
-          and effective_from &lt;= #{dateStr}
-          and (effective_to is null or effective_to &gt;= #{dateStr})
+        where t.busbar_num = #{busbarNum}
+          and t.effective_from &lt;= #{dateStr}
+          and (t.effective_to is null or t.effective_to &gt;= #{dateStr})
     </select>
 
     <!-- 闭合旧记录：将 effective_to 设为当前日期前一天 -->

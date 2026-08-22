@@ -134,7 +134,7 @@ class D5ControllerIT
 
     private static void cleanup()
     {
-        List<VqmsBusbarThreshold> existing = thresholdMapper.selectList(TEST_BUSBAR);
+        List<VqmsBusbarThreshold> existing = thresholdMapper.selectList(TEST_BUSBAR, null);
         existing.forEach(t -> thresholdMapper.deleteById(t.getThresholdId()));
         busbarMapper.deleteByBusbarNum(TEST_BUSBAR);
     }

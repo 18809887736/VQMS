@@ -1,5 +1,10 @@
 <template>
   <div class="app-container">
+    <!-- §9.2 独立指标强制标注：前端组件内置、系统强制，合格率/投运率与罚款同屏即随附，不依赖人工添加 -->
+    <el-alert type="warning" :closable="false" style="margin-bottom: 12px">
+      <b>投运率与罚款为独立指标</b>——两数不可互相推算，缺额百分点与罚款金额按考核单价线性换算仅为计费规则、不构成指标互换。
+    </el-alert>
+
     <el-form :model="queryParams" ref="queryRef" v-show="showSearch" :inline="true" label-width="80px">
       <el-form-item label="统计月份" prop="statMonth">
         <el-date-picker

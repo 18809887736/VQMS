@@ -9,7 +9,7 @@ import com.ruoyi.vqms.management.domain.VqmsBusbarThreshold;
  */
 public interface VqmsBusbarThresholdMapper
 {
-    List<VqmsBusbarThreshold> selectList(@Param("busbarNum") Long busbarNum);
+    List<VqmsBusbarThreshold> selectList(@Param("busbarNum") Long busbarNum, @Param("vGrade") Integer vGrade);
     VqmsBusbarThreshold selectById(Long thresholdId);
     VqmsBusbarThreshold selectByBusbarAndDate(Long busbarNum, String dateStr);
     int insert(VqmsBusbarThreshold entity);

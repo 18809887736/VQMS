@@ -62,6 +62,7 @@
 
 <script setup name="VqmsMonthly">
 import { listMonthly } from '@/api/vqms/voltageMonthly'
+import { listBusbar } from '@/api/vqms/busbar'
 
 const { proxy } = getCurrentInstance()
 const { vqms_v_grade } = proxy.useDict('vqms_v_grade')
@@ -82,13 +83,19 @@ const data = reactive({
 })
 const { queryParams } = toRefs(data)
 
-// 阶段 2 占位：与 sql/vqms.sql busbar 种子数据一致；后端 /vqms/vqms_busbar/list 列表接口就绪后改为接口拉取
-const busbarList = [
-  { busbarNum: '0', busbarName: '220kV 东母线', vGrade: '1' },
-  { busbarNum: '1', busbarName: '220kV 西母线', vGrade: '1' }
-]
+// 母线下拉走后端 /vqms/vqms_busbar/list；类型归一到字符串与字典编码对齐
+const busbarList = ref([])
+onMounted(() => {
+  listBusbar().then(response => {
+    busbarList.value = (response.rows || []).map(b => ({
+      busbarNum: String(b.busbarNum),
+      busbarName: b.busbarName,
+      vGrade: b.vGrade == null ? undefined : String(b.vGrade)
+    }))
+  })
+})
 const busbarOptions = computed(() =>
-  queryParams.value.vGrade ? busbarList.filter(b => b.vGrade === queryParams.value.vGrade) : busbarList
+  queryParams.value.vGrade ? busbarList.value.filter(b => b.vGrade === queryParams.value.vGrade) : busbarList.value
 )
 
 function handleVGradeChange() {

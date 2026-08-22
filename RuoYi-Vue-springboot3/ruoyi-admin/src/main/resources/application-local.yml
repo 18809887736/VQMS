@@ -1,0 +1,25 @@
+# 本地开发/冒烟 profile：远程 10.0.0.9 的 VQMS 栈资源 + 本机进程
+# 用法：--spring.profiles.active=druid,local + 环境变量
+#   MYSQL_ROOT_PASSWORD / VQMS_AVC_TEST_USER / VQMS_AVC_TEST_PASSWORD / VQMS_REDIS_PASSWORD
+# （凭证一律环境变量，不入库——CLAUDE.md Security）
+spring:
+  datasource:
+    druid:
+      master:
+        url: jdbc:mysql://10.0.0.9:13306/ry_vqms?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+        username: root
+        password: ${MYSQL_ROOT_PASSWORD}
+      slave:
+        enabled: true
+        url: jdbc:mysql://10.0.0.9:3306/qheatavchisdb?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+        username: ${VQMS_AVC_TEST_USER}
+        password: ${VQMS_AVC_TEST_PASSWORD}
+  data:
+    redis:
+      host: 10.0.0.9
+      port: 16379
+      database: 0
+      password: ${VQMS_REDIS_PASSWORD}
+
+server:
+  port: 7000

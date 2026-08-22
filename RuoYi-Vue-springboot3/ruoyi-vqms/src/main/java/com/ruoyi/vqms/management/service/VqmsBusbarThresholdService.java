@@ -32,9 +32,9 @@ public class VqmsBusbarThresholdService
     @Autowired
     private VqmsBusbarMapper busbarMapper;
 
-    public List<VqmsBusbarThreshold> selectList(Long busbarNum)
+    public List<VqmsBusbarThreshold> selectList(Long busbarNum, Integer vGrade)
     {
-        return thresholdMapper.selectList(busbarNum);
+        return thresholdMapper.selectList(busbarNum, vGrade);
     }
 
     public VqmsBusbarThreshold selectById(Long thresholdId)

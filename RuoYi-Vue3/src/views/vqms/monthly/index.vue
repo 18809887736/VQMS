@@ -37,7 +37,7 @@
     <el-table v-loading="loading" :data="dataList">
       <el-table-column label="统计月份" prop="statMonth" width="120" />
       <el-table-column label="母线" prop="busbarNum" width="80">
-        <template #default="scope">{{ scope.row.busbarNum === '0' ? '主母线' : '副母线' }}</template>
+        <template #default="scope">{{ String(scope.row.busbarNum) === '0' ? '主母线' : '副母线' }}</template>
       </el-table-column>
       <el-table-column label="电压等级" width="100" align="center">
         <template #default="scope"><dict-tag :options="vqms_v_grade" :value="scope.row.vGrade" /></template>

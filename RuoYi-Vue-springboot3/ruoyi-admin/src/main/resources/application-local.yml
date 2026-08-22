@@ -1,4 +1,5 @@
 # 本地开发/冒烟 profile：远程 10.0.0.9 的 VQMS 栈资源 + 本机进程
+# ⚠️ 仅本地 dev——master 运行时用 root 只是本地栈便利；部署/生产必须走最小权限账号 vqms_app（v5.0 §11）
 # 用法：--spring.profiles.active=druid,local + 环境变量
 #   MYSQL_ROOT_PASSWORD / VQMS_AVC_TEST_USER / VQMS_AVC_TEST_PASSWORD / VQMS_REDIS_PASSWORD
 # （凭证一律环境变量，不入库——CLAUDE.md Security）

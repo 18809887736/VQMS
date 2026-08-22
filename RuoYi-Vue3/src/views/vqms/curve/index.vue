@@ -33,7 +33,7 @@
       </template>
       <div ref="chartRef" style="height: 480px" v-loading="loading"></div>
       <div v-if="!loading && !hasData" class="empty-tip">暂无数据（选择母线与时间范围后查询）</div>
-      <div v-if="truncated" class="empty-tip">窗口超过 {{ pageSize }} 分钟，仅显示前 {{ pageSize }} 个点（消费模式随 D6 定稿）</div>
+      <div v-if="truncated" class="empty-tip">窗口超过 {{ pageSize }} 分钟，仅显示前 {{ pageSize }} 个点（完整回查请缩小时间范围）</div>
     </el-card>
   </div>
 </template>
@@ -63,7 +63,7 @@ const queryParams = reactive({
   busbarNum: undefined
 })
 
-// 图表一次渲染窗口内全部点：用接口上限 500（§10.2）；更优消费模式（聚合/分窗）随 D6 定稿
+// 图表一次渲染窗口内全部点：用接口上限 500（§10.2）；更优消费模式（聚合/分窗/hasMore 探测）待真实数据回放定稿
 const pageSize = 500
 
 function handleVGradeChange() {
@@ -75,7 +75,10 @@ function handleVGradeChange() {
 
 function renderChart(rows) {
   if (!chartRef.value) return
-  chartInstance = echarts.init(chartRef.value, 'macarons')
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value, 'macarons')
+    window.addEventListener('resize', handleResize)
+  }
   chartInstance.setOption({
     tooltip: { trigger: 'axis' },
     legend: { data: ['high_SV', 'low_SV'] },
@@ -87,7 +90,10 @@ function renderChart(rows) {
       { name: 'low_SV', type: 'line', data: rows.map(r => r.lowSV), smooth: true }
     ]
   })
-  window.addEventListener('resize', () => chartInstance && chartInstance.resize())
+}
+
+function handleResize() {
+  chartInstance && chartInstance.resize()
 }
 
 function handleQuery() {
@@ -130,7 +136,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
   chartInstance && chartInstance.dispose()
+  chartInstance = null
 })
 </script>
 

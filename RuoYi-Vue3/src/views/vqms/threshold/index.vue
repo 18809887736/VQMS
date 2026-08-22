@@ -186,6 +186,10 @@ function handleUpdate(row) {
   const id = row.thresholdId || ids.value[0]
   getThreshold(id).then(response => {
     Object.assign(form.value, response.data)
+    // 下拉 option 值为字符串，后端回填是 number——归一避免 el-option 严格匹配失配显示裸编号
+    if (form.value.busbarNum != null) {
+      form.value.busbarNum = String(form.value.busbarNum)
+    }
     open.value = true
     title.value = '修改母线阈值'
   }).catch(() => {})

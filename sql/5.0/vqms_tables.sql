@@ -7,7 +7,7 @@
 --   vqms_busbar / vqms_busbar_group / vqms_yc_point_map / vqms_busbar_threshold / vqms_judge_param / vqms_command_ledger
 -- 不含：RuoYi sys_*（复用 ry_*.sql）、Quartz 表、派生统计表（§6.3 搁置轨待定）、字典 / 关验证码覆盖（见 sql/vqms.sql）。
 --
--- 说明：结构先行、初始数值后填；判定口径已改指令级包络（草稿v5_0 §2），管理表字段与判定实现解耦，属确定轨。
+-- 说明：结构先行、初始数值后填；判定口径已改指令级包络（正式v1_0 §2），管理表字段与判定实现解耦，属确定轨。
 --   逻辑 FK 不建物理外键（跨库 + RuoYi 风格），一致性靠应用层写路径存在性校验（§6.2 头部）。
 -- ============================================================
 
@@ -90,7 +90,7 @@ INSERT INTO `vqms_yc_point_map` (`yc_num`, `point_name`, `point_type`, `state_1_
 
 -- ============================================================
 -- 6.2.4 vqms_busbar_threshold（阈值，带生效区间）
---   ⚠️ 占位/角色待定，禁用旧口径：判定已改草稿 §2 指令级包络（§8）。本表 tolerance_v 在旧 v3.4 |average_SV−plan_SV|≤tolerance_v
+--   ⚠️ 占位/角色待定，禁用旧口径：判定已改正式版 §2 指令级包络（§8）。本表 tolerance_v 在旧 v3.4 |average_SV−plan_SV|≤tolerance_v
 --   口径下是判定核心，该旧口径已彻底废弃、严禁再引用。新口径下判定用 warn_info 目标 + 包络区间，不读 plan_SV/tolerance_v；
 --   本列角色待算法定稿时重新定位。plan_sv_invalid_policy 同为旧模型遗留列，暂无消费方。
 -- ============================================================

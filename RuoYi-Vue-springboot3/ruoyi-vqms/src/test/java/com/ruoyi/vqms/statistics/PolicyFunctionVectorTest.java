@@ -117,7 +117,7 @@ class PolicyFunctionVectorTest
         assertBucket(Candidate.YI_50, PARTIAL_80, Disposition.COUNT_NORMAL);
         assertBucket(Candidate.YI_50, PARTIAL_40, Disposition.EXCLUDE_REPORTED);
         // ⚠ UNVERIFIED-口径（对抗验证吸收 2026-08-22）：阈值边界语义两份权威文档相反——
-        // 草稿 v5_0 §2.8 / v5.0 §8.6 写缺失率「≥50% 整窗剔除」（⇔ 可用度恰 50% 应剔除），
+        // 正式 v1_0 §2.8 / v5.0 §8.6 写缺失率「≥50% 整窗剔除」（⇔ 可用度恰 50% 应剔除），
         // 策略文档 §3.2 写「可用 ≥50% 用剩余」。实现取后者（可用 ≥ 阈值 → 正常记账）；
         // 选套拍板时须一并钉死边界方向，届时本用例随拍板复核。
         Assertions.assertEquals(Disposition.COUNT_NORMAL,

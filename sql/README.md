@@ -26,13 +26,13 @@ vqms_menu.sql         # VQMS 业务菜单（sys_menu）+ 普通角色(role_id=2)
 | `00-create-app-user.sh` | 首启建库后建 `vqms_app` 最小权限账号（`SELECT/INSERT/UPDATE/DELETE` 仅 `ry_vqms.*`，无 DDL/GRANT） | CLAUDE.md §Security（账号分离） |
 | `quartz.sql` | RuoYi Quartz 原生调度表，原样不动 | RuoYi 原生 |
 | `ry_20260417.sql` | RuoYi `sys_*` 管理表 + 初始数据，原样不动 | RuoYi 原生 |
-| `vqms.sql` | VQMS 自建管理表 + 字典 + 关验证码覆盖 | 项目规划_v5_0.md §6.2 / AVC考核核心算法_草稿v5_0 §2 |
+| `vqms.sql` | VQMS 自建管理表 + 字典 + 关验证码覆盖 | 项目规划_v5_0.md §6.2 / AVC考核核心算法_v1_0 §2 |
 | `vqms_menu.sql` | VQMS 业务菜单 + 角色授权 | 前端 `src/views/vqms/` 7 页 |
 
 ## 文档同步说明
 
 - `vqms.sql` 管理表 DDL 以 **项目规划 v5.0**（原 v4.1 已于 2026-08-18 并入 v5.0）§6.2 为准；
-  判定口径以 **AVC考核核心算法_草稿v5_0** §2 为准。
+  判定口径以 **AVC考核核心算法_v1_0** §2 为准。
 - `ry_*` / `quartz.sql` 为 RuoYi 原生，按 CLAUDE.md「不修改 RuoYi 原生模块」原样复用。
 
 ## 已知待清理（文档债，非 sql/ 范围）

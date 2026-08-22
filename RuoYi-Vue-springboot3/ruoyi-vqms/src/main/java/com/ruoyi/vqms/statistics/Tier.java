@@ -1,7 +1,7 @@
 package com.ruoyi.vqms.statistics;
 
 /**
- * 两档判定档位（草稿 v5_0 §2.4，两档平行考察、互不隶属、不 fall-through）。
+ * 两档判定档位（正式 v1_0 §2.4，两档平行考察、互不隶属、不 fall-through）。
  */
 public enum Tier
 {

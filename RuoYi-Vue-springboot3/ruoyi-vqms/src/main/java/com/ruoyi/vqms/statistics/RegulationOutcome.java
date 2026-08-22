@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * judge 输出契约（sealed，草稿 v5_0 §2.5 / v5.0 §8.2）。
+ * judge 输出契约（sealed，正式 v1_0 §2.5 / v5.0 §8.2）。
  *
  * <p>两态 + 判不了信号：<b>Undecodable 不是第三判定态</b>——它是输入有效性信号
  * （解码失败如实上报），处置决策归参数化策略层（{@code DataUnavailabilityPolicy}）。</p>

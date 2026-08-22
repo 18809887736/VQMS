@@ -8,7 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 确定性占位判定实现（搁置轨 stub，v5.0 §8.2 / 草稿 v5_0 §2.5）。
+ * 确定性占位判定实现（搁置轨 stub，v5.0 §8.2 / 正式 v1_0 §2.5）。
  *
  * <p><b>契约级部分为真</b>（输出契约的稳定面，D9 完成标准「Undecodable 按原因分类、
  * completeness 如实上报」要求）：</p>
@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  *   <li>解码<b>分类</b>：目标值/增量形态识别 + 三类失败归因——只判"能不能解"，
  *       <b>不算 V_target 数值</b>（数值解码属算法核心，随 S1 定稿）；</li>
  *   <li>窗口结构统计：completeness（[1..t_econ] 有数据分钟占比，如实上报不处置）、
- *       invalidTiers（该档整档全缺或 L>H → 该档不可判，草稿 §2.5 两种成因）；</li>
+ *       invalidTiers（该档整档全缺或 L>H → 该档不可判，正式版 §2.5 两种成因）；</li>
  *   <li>分类优先级：结构脏写（尾码缺失/长度不对/数字槽位坏）→ 循环码非法（第 2 位 ∉
  *       {0..5}，Leo 2026-08-19 值域拍板；轮转规律待实证不影响本分类）→ 缺 t₀ 电压。</li>
  * </ul>

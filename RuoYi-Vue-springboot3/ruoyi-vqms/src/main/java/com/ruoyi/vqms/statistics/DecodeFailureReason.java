@@ -1,7 +1,7 @@
 package com.ruoyi.vqms.statistics;
 
 /**
- * 解码失败原因三分类（草稿 v5_0 §2.5 / §2.8；vqms_command_ledger 流水重算的归因口径）。
+ * 解码失败原因三分类（正式 v1_0 §2.5 / §2.8；vqms_command_ledger 流水重算的归因口径）。
  */
 public enum DecodeFailureReason
 {

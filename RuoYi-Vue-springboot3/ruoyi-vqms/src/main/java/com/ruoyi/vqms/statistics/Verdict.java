@@ -1,7 +1,7 @@
 package com.ruoyi.vqms.statistics;
 
 /**
- * 两态判定结论（草稿 v5_0 §2.5）——<b>不含 EXEMPT</b>：免考是阶段三后置读 yx501 的应用结果，
+ * 两态判定结论（正式 v1_0 §2.5）——<b>不含 EXEMPT</b>：免考是阶段三后置读 yx501 的应用结果，
  * 不是判定产物（v5.0 §8.2 三阶段管线，Leo 2026-08-14 拍板）。
  */
 public enum Verdict

@@ -92,11 +92,11 @@ class D7JudgeParamIT
     @AfterAll
     static void tearDown()
     {
-        // 还原 t_fast 到种子默认值 4（若测试中途失败也尽力还原）
+        // 只归一测试自身可能触碰的 {3,4}；其余值（现场合法整定 1/2）保留不动——共享库保护
         try
         {
             VqmsJudgeParam tFast = mapper.selectByKey("t_fast");
-            if (tFast.getParamValue() != 4)
+            if (tFast != null && (tFast.getParamValue() == 3 || tFast.getParamValue() == 4))
             {
                 VqmsJudgeParam restore = new VqmsJudgeParam();
                 restore.setParamKey("t_fast");
@@ -124,7 +124,7 @@ class D7JudgeParamIT
     void assert_种子四行在()
     {
         List<VqmsJudgeParam> list = service.selectList();
-        Assertions.assertEquals(4, list.size(), "判定参数种子应为 4 行");
+        Assertions.assertTrue(list.size() >= 4, "判定参数种子至少 4 行（自定义行允许），实际 " + list.size());
         Assertions.assertEquals(5, service.getInt("t_econ"));
         Assertions.assertEquals(1, service.getInt("tier_threshold_fast"));
         Assertions.assertEquals(5, service.getInt("tier_threshold_econ"));
@@ -193,6 +193,55 @@ class D7JudgeParamIT
                 .content("{\"paramKey\":\"t_fast\",\"paramValue\":9}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500));
+    }
+
+    /** blocker 修复回归锁：自定义键 insert→getInt→delete 回路（蕴含式 CHECK 放行新键） */
+    @Test
+    void assert_自定义键增删回路()
+    {
+        VqmsJudgeParam probe = new VqmsJudgeParam();
+        probe.setParamKey("d7_it_probe");
+        probe.setParamValue(7);
+        probe.setName("IT 探针");
+        probe.setValueMin(1);
+        probe.setValueMax(10);
+        Assertions.assertEquals(1, service.insert(probe));
+        Assertions.assertEquals(7, service.getInt("d7_it_probe"));
+        Long probeId = service.selectList().stream()
+                .filter(p -> "d7_it_probe".equals(p.getParamKey())).findFirst().orElseThrow().getParamId();
+        Assertions.assertEquals(1, service.deleteById(probeId));
+    }
+
+    /** 重复键 insert 友好拒绝（不裸抛 DuplicateKeyException） */
+    @Test
+    void assert_重复键友好拒绝()
+    {
+        VqmsJudgeParam dup = new VqmsJudgeParam();
+        dup.setParamKey("t_fast");
+        dup.setParamValue(2);
+        dup.setName("重复键");
+        Assertions.assertThrows(IllegalArgumentException.class, () -> service.insert(dup),
+                "应报「参数键已存在」而非裸 DB 异常");
+    }
+
+    /** NULL 安全等值回归锁：原生 SQL 旁路直改 t_fast 值域列为 NULL 被 ck_locked_rows 拒（<=> 语义）。
+     *  经 mapper 动态 SQL 置不了 NULL（if 判空跳列），须 JDBC 原生语句才是真旁路。 */
+    @Test
+    void assert_绕过Service置NULL值域被CHECK拒() throws Exception
+    {
+        java.sql.Connection conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://10.0.0.9:13306/ry_vqms?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8",
+                "root", java.util.Objects.requireNonNull(System.getenv("MYSQL_ROOT_PASSWORD")));
+        try (java.sql.Statement st = conn.createStatement())
+        {
+            Assertions.assertThrows(java.sql.SQLException.class,
+                    () -> st.executeUpdate("update vqms_judge_param set value_min = null, value_max = null where param_key = 't_fast'"),
+                    "值域列置 NULL 应被拒（普通 = 遇 NULL 求值 NULL 放行，须 <=>）");
+        }
+        finally
+        {
+            conn.close();
+        }
     }
 
     private static void updateFast(int value)

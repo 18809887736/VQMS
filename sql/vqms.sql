@@ -171,14 +171,17 @@ create table vqms_judge_param (
   primary key (param_id),
   unique key uk_param_key (param_key),
   -- 值域/锁定结构性下沉（D7，测试方案 §4.6 两段断言之 DB 段；Service 层另留友好报错）：
-  -- ① 行本地值域；② 锁定行固定值——t_econ=5 写死、分档阈值 1/5 为附件6 政策值，旁路直改被拦；
-  -- 跨行 t_fast<t_econ 由 ①(t_fast∈[1,4]) + ②(t_econ 钉 5) 传导等价保证（CHECK 行本地写不了跨行）
-  constraint ck_value_range check (param_value between value_min and value_max),
+  -- 蕴含式（非该键恒真，仅锁定键钉值/值域列）——非白名单：新 param_key 的行可插入（v4.0 A6 扩展路保留）。
+  -- ① 行本地值域（min/max 任一为 NULL 则不设限——自定义行允许开放值域，必需键的值域列由 ② 钉死防 NULL 旁路）；
+  -- ② 锁定行钉值+值域列（t_econ=5/阈值 1·5 政策值；t_fast 只钉值域列 [1,4] 不钉值——可整定）。
+  -- 跨行 t_fast<t_econ 由 ①(t_fast∈[1,4]) + ②(t_econ 钉 5) 传导等价保证（CHECK 行本地写不了跨行）。
+  -- ⚠️ 已知边界：CHECK 不拦 DELETE，必需行删除仅 Service 层拦（vqms.sql 注记 2026-08-22 D7 对抗验证吸收）。
+  constraint ck_value_range check (value_min is null or value_max is null or param_value between value_min and value_max),
   constraint ck_locked_rows check (
-    (param_key = 't_econ'              and param_value = 5)
-    or (param_key = 'tier_threshold_fast' and param_value = 1)
-    or (param_key = 'tier_threshold_econ' and param_value = 5)
-    or (param_key = 't_fast')
+    (param_key <> 't_econ' or (param_value <=> 5 and value_min <=> 5 and value_max <=> 5))
+    and (param_key <> 'tier_threshold_fast' or (param_value <=> 1 and value_min <=> 1 and value_max <=> 1))
+    and (param_key <> 'tier_threshold_econ' or (param_value <=> 5 and value_min <=> 5 and value_max <=> 5))
+    and (param_key <> 't_fast' or (value_min <=> 1 and value_max <=> 4))
   )
 ) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 判定整定参数';
 

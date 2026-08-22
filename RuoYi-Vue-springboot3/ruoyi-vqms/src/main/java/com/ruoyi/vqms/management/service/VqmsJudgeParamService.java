@@ -16,8 +16,9 @@ import com.ruoyi.vqms.management.mapper.VqmsJudgeParamMapper;
  *
  * <p>值域/锁定双层防线：Service 层友好报错（t_fast∈[1,4] 且 &lt; t_econ、锁定行拒绝修改），
  * DB CHECK 结构性兜底（旁路直改被拒——测试方案 §4.6 两段断言之 DB 段）。
- * 读走 Redis 缓存 {@code vqms:judgeParam:{key}}，写后 evict、启动灌缓存——判定侧（搁置轨 S1）
- * 经 {@link #getInt(String)} 取参，改值后下一次读取即新值。</p>
+ * 读走 Redis 缓存 {@code vqms:judgeParam:{key}}，写后覆盖（带 TTL 兜底收敛，非 evict——规约
+ * §6.2.5 字面 CacheEvict，实现取写穿 + TTL，行为契约「改值后下一次读取即新值」等价且省一次回源，
+ * 差异已在 D7 报告声明）、启动灌缓存——判定侧（搁置轨 S1）经 {@link #getInt(String)} 取参。</p>
  */
 @Service
 public class VqmsJudgeParamService
@@ -32,6 +33,9 @@ public class VqmsJudgeParamService
 
     private static final String ECON_KEY = "t_econ";
 
+    /** 缓存 TTL：兜底收敛窗口——写 DB 后、覆盖缓存前崩溃的陈旧值最迟 24h 自愈（无 TTL 则永不收敛） */
+    private static final java.time.Duration CACHE_TTL = java.time.Duration.ofHours(24);
+
     @Autowired
     private VqmsJudgeParamMapper judgeParamMapper;
 
@@ -41,8 +45,9 @@ public class VqmsJudgeParamService
     @PostConstruct
     public void warmupCache()
     {
-        judgeParamMapper.selectList().forEach(this::putCache);
-        log.info("判定参数缓存预热完成（{} 项）", LOCKED_KEYS.size() + 1);
+        java.util.List<VqmsJudgeParam> all = judgeParamMapper.selectList();
+        all.forEach(this::putCache);
+        log.info("判定参数缓存预热完成（{} 项）", all.size());
     }
 
     /** 判定侧取参入口：缓存优先，miss 回源并灌缓存 */
@@ -59,7 +64,12 @@ public class VqmsJudgeParamService
         {
             throw new IllegalArgumentException("判定参数不存在: " + paramKey);
         }
-        redisCache.setCacheObject(cacheKey, param.getParamValue());
+        if (!"0".equals(param.getStatus()))
+        {
+            throw new IllegalArgumentException("判定参数已停用: " + paramKey);
+        }
+        redisCache.setCacheObject(cacheKey, param.getParamValue(), (int) CACHE_TTL.getSeconds(),
+                java.util.concurrent.TimeUnit.SECONDS);
         return param.getParamValue();
     }
 
@@ -79,6 +89,10 @@ public class VqmsJudgeParamService
     public int insert(VqmsJudgeParam entity)
     {
         validateValueRange(entity);
+        if (judgeParamMapper.countByKey(entity.getParamKey()) > 0)
+        {
+            throw new IllegalArgumentException("参数键已存在: " + entity.getParamKey());
+        }
         int rows = judgeParamMapper.insert(entity);
         putCache(entity);
         return rows;
@@ -100,6 +114,11 @@ public class VqmsJudgeParamService
         validateValueRange(merged);
         validateCrossRow(merged);
         int rows = judgeParamMapper.update(merged);
+        if (rows == 0)
+        {
+            redisCache.deleteObject(cacheKey(merged.getParamKey()));
+            throw new IllegalArgumentException("参数不存在: " + merged.getParamKey());
+        }
         putCache(merged);
         return rows;
     }
@@ -166,7 +185,8 @@ public class VqmsJudgeParamService
     {
         if (param.getParamKey() != null && param.getParamValue() != null)
         {
-            redisCache.setCacheObject(cacheKey(param.getParamKey()), param.getParamValue());
+            redisCache.setCacheObject(cacheKey(param.getParamKey()), param.getParamValue(),
+                    (int) CACHE_TTL.getSeconds(), java.util.concurrent.TimeUnit.SECONDS);
         }
     }
 

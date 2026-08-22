@@ -35,6 +35,7 @@ import com.ruoyi.vqms.management.mapper.VqmsYcPointMapMapper;
 import com.ruoyi.vqms.management.service.VqmsBusbarGroupService;
 import com.ruoyi.vqms.management.service.VqmsBusbarService;
 import com.ruoyi.vqms.management.service.VqmsBusbarThresholdService;
+import com.ruoyi.vqms.management.service.VqmsJudgeParamService;
 
 /**
  * D2 集成测试：管理表 DDL + 逻辑 FK 校验。
@@ -54,7 +55,10 @@ class D2BusinessLogicIT
 
     @Configuration
     @MapperScan("com.ruoyi.vqms.management.mapper")
-    @ComponentScan("com.ruoyi.vqms.management.service")
+    @ComponentScan(basePackages = "com.ruoyi.vqms.management.service",
+            excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
+                    type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
+                    classes = VqmsJudgeParamService.class)) // D7 Service 依赖 RedisCache，D2 上下文不载入
     static class TestConfig
     {
         @Bean
@@ -140,7 +144,7 @@ class D2BusinessLogicIT
         Assertions.assertTrue(groupCount >= 2, "busbar_group 至少应有 2 条种子数据，实际=" + groupCount);
         Assertions.assertTrue(barCount >= 2, "busbar 至少应有 2 条种子数据，实际=" + barCount);
         Assertions.assertTrue(ycCount >= 3, "yc_point_map 至少应有 3 条种子数据");
-        Assertions.assertEquals(4, paramCount, "judge_param 种子应为 4");
+        Assertions.assertTrue(paramCount >= 4, "judge_param 种子至少 4（D7 起允许自定义参数行）");
     }
 
     // ───────────────────── 断言 2: Service.insert(VqmsBusbar) → group_num 不存在时抛异常 ─────────────────────

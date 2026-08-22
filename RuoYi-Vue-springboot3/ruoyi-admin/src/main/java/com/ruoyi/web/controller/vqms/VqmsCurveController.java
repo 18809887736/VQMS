@@ -18,7 +18,10 @@ import com.ruoyi.vqms.source.reader.SourceReader;
 /**
  * 电压曲线查询（v5.0 §10.1）：母线 + 时间范围，逐分钟 high/low，数据经 D1 reader + D4 闸门取自外部源。
  *
- * <p>限量（§10.2，反制 his_curve_sv 无索引全表扫）：时间范围上限 31 天、pageSize 上限 500。</p>
+ * <p>限量（§10.2）：时间范围上限 31 天、pageSize 上限 500、busbarNum 必填（单母线 ≤31 天 ≈ 4.5 万行物化）。
+ * ⚠️ 已知边界（Leo 2026-08-21 评审指出）：外部表无索引且不可加（只读），全表扫描不因分页消除——
+ * 本限量护的是物化规模与返回规模，不护扫描成本；SQL LIMIT 下推与 total 准确性（需额外 COUNT 扫描）
+ * 的取舍随 D6 图表消费模式（聚合/分窗）一并定，技术债登记于 D5 报告 §五。</p>
  */
 @RestController
 @RequestMapping("/vqms/curve")
@@ -39,6 +42,10 @@ public class VqmsCurveController extends BaseController
         if (StringUtils.isEmpty(startTime) || StringUtils.isEmpty(endTime))
         {
             throw new ServiceException("startTime / endTime 必填");
+        }
+        if (busbarNum == null)
+        {
+            throw new ServiceException("busbarNum 必填（曲线查询按单母线）");
         }
         LocalDateTime start = MinuteRounder.parse(startTime);
         LocalDateTime end = MinuteRounder.parse(endTime);

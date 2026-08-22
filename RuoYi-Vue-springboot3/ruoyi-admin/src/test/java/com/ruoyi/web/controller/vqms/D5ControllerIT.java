@@ -234,6 +234,15 @@ class D5ControllerIT
     }
 
     @Test
+    void curve_缺母线被拒() throws Exception
+    {
+        mockMvc.perform(get("/vqms/curve/list")
+                .param("startTime", "2026-08-21 10:00:00").param("endTime", "2026-08-21 10:05:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500));
+    }
+
+    @Test
     void 搁置轨端点_空表与显式拒绝()
     {
         assertEmptyList("/vqms/stats/daily/list");

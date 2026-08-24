@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsStatsRollupMapper">
+
+    <!-- 铁律：对计数求和、绝不平均率列。调节侧率由查询层按 counts 重算（两链待 S5 拍板，DDL 不预支）；
+         投运侧率/缺额在本层按合计分钟重算（99% 阈值政策写死），罚款按日累加（容量跨月变更亦记账正确）。 -->
+
+    <insert id="rollupRegulationDaily">
+        insert into vqms_regulation_daily
+          (stat_date, algorithm_id, total_cmds,
+           qualified_fast, penalized_fast, exempted_fast, invalid_fast,
+           qualified_econ, penalized_econ, exempted_econ, invalid_econ,
+           undecodable_count, pended_count, excluded_count, completeness_sum)
+        select stat_date,
+               case when count(distinct algorithm_id) = 1 then min(algorithm_id) else 'MIXED' end,
+               count(*),
+               sum(fast_state='QUALIFIED'), sum(fast_state='PENALIZED'),
+               sum(fast_state='EXEMPTED'), sum(fast_state='INVALID'),
+               sum(econ_state='QUALIFIED'), sum(econ_state='PENALIZED'),
+               sum(econ_state='EXEMPTED'), sum(econ_state='INVALID'),
+               sum(undecodable_reason is not null),
+               sum(disposition='PEND_MARKED'), sum(disposition='EXCLUDE_REPORTED'),
+               sum(completeness)
+        from vqms_regulation_cmd
+        where stat_date between #{startDate} and #{endDate}
+        group by stat_date
+        on duplicate key update
+          algorithm_id = values(algorithm_id), total_cmds = values(total_cmds),
+          qualified_fast = values(qualified_fast), penalized_fast = values(penalized_fast),
+          exempted_fast = values(exempted_fast), invalid_fast = values(invalid_fast),
+          qualified_econ = values(qualified_econ), penalized_econ = values(penalized_econ),
+          exempted_econ = values(exempted_econ), invalid_econ = values(invalid_econ),
+          undecodable_count = values(undecodable_count), pended_count = values(pended_count),
+          excluded_count = values(excluded_count), completeness_sum = values(completeness_sum)
+    </insert>
+
+    <insert id="rollupRegulationMonthly">
+        insert into vqms_regulation_monthly
+          (stat_month, algorithm_id, total_cmds,
+           qualified_fast, penalized_fast, exempted_fast, invalid_fast,
+           qualified_econ, penalized_econ, exempted_econ, invalid_econ,
+           undecodable_count, pended_count, excluded_count, completeness_sum)
+        select date_format(stat_date, '%Y-%m'),
+               case when count(distinct algorithm_id) = 1 then min(algorithm_id) else 'MIXED' end,
+               sum(total_cmds),
+               sum(qualified_fast), sum(penalized_fast), sum(exempted_fast), sum(invalid_fast),
+               sum(qualified_econ), sum(penalized_econ), sum(exempted_econ), sum(invalid_econ),
+               sum(undecodable_count), sum(pended_count), sum(excluded_count), sum(completeness_sum)
+        from vqms_regulation_daily
+        where stat_date between #{startDate} and #{endDate}
+        group by date_format(stat_date, '%Y-%m')
+        on duplicate key update
+          algorithm_id = values(algorithm_id), total_cmds = values(total_cmds),
+          qualified_fast = values(qualified_fast), penalized_fast = values(penalized_fast),
+          exempted_fast = values(exempted_fast), invalid_fast = values(invalid_fast),
+          qualified_econ = values(qualified_econ), penalized_econ = values(penalized_econ),
+          exempted_econ = values(exempted_econ), invalid_econ = values(invalid_econ),
+          undecodable_count = values(undecodable_count), pended_count = values(pended_count),
+          excluded_count = values(excluded_count), completeness_sum = values(completeness_sum)
+    </insert>
+
+    <insert id="rollupRegulationYearly">
+        insert into vqms_regulation_yearly
+          (stat_year, algorithm_id, total_cmds,
+           qualified_fast, penalized_fast, exempted_fast, invalid_fast,
+           qualified_econ, penalized_econ, exempted_econ, invalid_econ,
+           undecodable_count, pended_count, excluded_count, completeness_sum)
+        select cast(substring(stat_month, 1, 4) as signed),
+               case when count(distinct algorithm_id) = 1 then min(algorithm_id) else 'MIXED' end,
+               sum(total_cmds),
+               sum(qualified_fast), sum(penalized_fast), sum(exempted_fast), sum(invalid_fast),
+               sum(qualified_econ), sum(penalized_econ), sum(exempted_econ), sum(invalid_econ),
+               sum(undecodable_count), sum(pended_count), sum(excluded_count), sum(completeness_sum)
+        from vqms_regulation_monthly
+        where stat_month between substring(#{startDate}, 1, 7) and substring(#{endDate}, 1, 7)
+        group by substring(stat_month, 1, 4)
+        on duplicate key update
+          algorithm_id = values(algorithm_id), total_cmds = values(total_cmds),
+          qualified_fast = values(qualified_fast), penalized_fast = values(penalized_fast),
+          exempted_fast = values(exempted_fast), invalid_fast = values(invalid_fast),
+          qualified_econ = values(qualified_econ), penalized_econ = values(penalized_econ),
+          exempted_econ = values(exempted_econ), invalid_econ = values(invalid_econ),
+          undecodable_count = values(undecodable_count), pended_count = values(pended_count),
+          excluded_count = values(excluded_count), completeness_sum = values(completeness_sum)
+    </insert>
+
+    <insert id="rollupRuntimeMonthly">
+        insert into vqms_runtime_monthly
+          (stat_month, in_service_min, exit_grid_min, exit_nongrid_min, offline_min,
+           rated_capacity_kw, rate_pct, shortfall_pct, penalty_score)
+        select date_format(stat_date, '%Y-%m'),
+               sum(in_service_min), sum(exit_grid_min), sum(exit_nongrid_min), sum(offline_min),
+               max(rated_capacity_kw),
+               case when sum(in_service_min) + sum(exit_nongrid_min) = 0 then null
+                    else round(sum(in_service_min) * 100
+                         / (sum(in_service_min) + sum(exit_nongrid_min)), 3) end,
+               case when sum(in_service_min) + sum(exit_nongrid_min) = 0 then null
+                    else round(greatest(0, 99 - sum(in_service_min) * 100
+                         / (sum(in_service_min) + sum(exit_nongrid_min))), 3) end,
+               sum(penalty_score)
+        from vqms_runtime_daily
+        where stat_date between #{startDate} and #{endDate}
+        group by date_format(stat_date, '%Y-%m')
+        on duplicate key update
+          in_service_min = values(in_service_min), exit_grid_min = values(exit_grid_min),
+          exit_nongrid_min = values(exit_nongrid_min), offline_min = values(offline_min),
+          rated_capacity_kw = values(rated_capacity_kw), rate_pct = values(rate_pct),
+          shortfall_pct = values(shortfall_pct), penalty_score = values(penalty_score)
+    </insert>
+
+    <insert id="rollupRuntimeYearly">
+        insert into vqms_runtime_yearly
+          (stat_year, in_service_min, exit_grid_min, exit_nongrid_min, offline_min,
+           rated_capacity_kw, rate_pct, shortfall_pct, penalty_score)
+        select cast(substring(stat_month, 1, 4) as signed),
+               sum(in_service_min), sum(exit_grid_min), sum(exit_nongrid_min), sum(offline_min),
+               max(rated_capacity_kw),
+               case when sum(in_service_min) + sum(exit_nongrid_min) = 0 then null
+                    else round(sum(in_service_min) * 100
+                         / (sum(in_service_min) + sum(exit_nongrid_min)), 3) end,
+               case when sum(in_service_min) + sum(exit_nongrid_min) = 0 then null
+                    else round(greatest(0, 99 - sum(in_service_min) * 100
+                         / (sum(in_service_min) + sum(exit_nongrid_min))), 3) end,
+               sum(penalty_score)
+        from vqms_runtime_monthly
+        where stat_month between substring(#{startDate}, 1, 7) and substring(#{endDate}, 1, 7)
+        group by substring(stat_month, 1, 4)
+        on duplicate key update
+          in_service_min = values(in_service_min), exit_grid_min = values(exit_grid_min),
+          exit_nongrid_min = values(exit_nongrid_min), offline_min = values(offline_min),
+          rated_capacity_kw = values(rated_capacity_kw), rate_pct = values(rate_pct),
+          shortfall_pct = values(shortfall_pct), penalty_score = values(penalty_score)
+    </insert>
+</mapper>

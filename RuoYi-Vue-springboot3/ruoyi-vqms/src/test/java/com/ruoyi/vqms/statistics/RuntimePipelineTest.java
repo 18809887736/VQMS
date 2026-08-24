@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 /**
  * S4 Slice2 L0：RuntimePipeline 编排（正式 v1_0 §1.3~§1.5）——mock 信号读取，真分类器/真统计。
  *
- * <p>覆盖：全投运日 100%、混合退出手算向量（罚款恰 5 分）、零并网日率列 NULL、
+ * <p>覆盖：全投运日 100%、混合退出手算向量（罚款恰 4.4 分）、零并网日率列 NULL、
  * 容量缺失罚款 NULL、两母线原因组合从严（max）、并网 ≥10 边界。</p>
  */
 class RuntimePipelineTest

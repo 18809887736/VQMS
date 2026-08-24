@@ -19,6 +19,7 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,6 +48,7 @@ class S2S3StatsTablesIT
     private static final long SENTINEL_OBJ = -777001L; // 测试哨兵 obj_num，清理锚点
 
     private static Connection conn;
+    private static com.ruoyi.vqms.management.mapper.VqmsStatsRollupMapper rollupMapper;
 
     @BeforeAll
     static void setUp() throws Exception
@@ -70,6 +72,23 @@ class S2S3StatsTablesIT
                 }
             }
         }
+
+        // Slice3：rollup 走 mapper 权威 SQL（单一来源）——手工 SqlSessionFactory 装配（D9 IT 同款）
+        org.springframework.jdbc.datasource.DriverManagerDataSource ds =
+                new org.springframework.jdbc.datasource.DriverManagerDataSource();
+        ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        ds.setUrl(DB_URL);
+        ds.setUsername("root");
+        ds.setPassword(password);
+        org.mybatis.spring.SqlSessionFactoryBean factoryBean =
+                new org.mybatis.spring.SqlSessionFactoryBean();
+        factoryBean.setDataSource(ds);
+        factoryBean.setMapperLocations(new PathMatchingResourcePatternResolver()
+                .getResources("classpath*:mapper/vqms/*Mapper.xml"));
+        org.apache.ibatis.session.SqlSessionFactory sessionFactory = factoryBean.getObject();
+        rollupMapper = sessionFactory.getConfiguration()
+                .getMapper(com.ruoyi.vqms.management.mapper.VqmsStatsRollupMapper.class,
+                        sessionFactory.openSession());
     }
 
     @AfterAll
@@ -88,6 +107,9 @@ class S2S3StatsTablesIT
             st.execute("delete from vqms_runtime_daily where stat_date between '"
                     + TEST_DATE_A + "' and '" + TEST_DATE_A + "'");
             st.execute("delete from vqms_runtime_monthly where stat_month = '2026-08'");
+            st.execute("delete from vqms_regulation_monthly where stat_month = '2026-08'");
+            st.execute("delete from vqms_regulation_yearly where stat_year = 2026");
+            st.execute("delete from vqms_runtime_yearly where stat_year = 2026");
         }
         finally
         {
@@ -352,6 +374,65 @@ class S2S3StatsTablesIT
                 assertEquals(60, rs.getInt(3));
                 assertEquals(1620, rs.getInt(4), "OFFLINE 求和透传（不进率算术）");
             }
+        }
+    }
+
+    /**
+     * Slice3：mapper 权威 rollup 级联——五语句全走 VqmsStatsRollupMapper（SQL 单一来源），
+     * 复用 order(3)~(5) 落下的行，验证幂等重跑与三级聚合。
+     */
+    @Test
+    @Order(6)
+    void cascadeRollup_viaMapper_idempotentAndAggregates()
+    throws Exception
+    {
+        // 重跑日级（order(4) 已插过一行 daily）：幂等覆盖不翻倍
+        rollupMapper.rollupRegulationDaily(TEST_DATE_A, TEST_DATE_A);
+        assertEquals(1, count("select count(*) from vqms_regulation_daily"
+                + " where stat_date='" + TEST_DATE_A + "'"));
+        assertEquals(5, count("select total_cmds from vqms_regulation_daily"
+                + " where stat_date='" + TEST_DATE_A + "'"), "幂等重算后分母不变");
+
+        // 月级/年级（调节）：5 条指令上卷
+        rollupMapper.rollupRegulationMonthly(TEST_DATE_A, TEST_DATE_A);
+        rollupMapper.rollupRegulationYearly(TEST_DATE_A, TEST_DATE_A);
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "select algorithm_id, total_cmds from vqms_regulation_monthly"
+                             + " where stat_month='2026-08'"))
+        {
+            assertTrue(rs.next());
+            assertEquals("V1_0", rs.getString(1), "月级单一算法记该 ID【决策④】");
+            assertEquals(5, rs.getInt(2));
+        }
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "select total_cmds from vqms_regulation_yearly where stat_year=2026"))
+        {
+            assertTrue(rs.next());
+            assertEquals(5, rs.getInt(1));
+        }
+
+        // 投运侧：mapper 版月级与 order(5) 原生 SQL 同数（SQL 单一来源前先证等价），年级带率重算
+        rollupMapper.rollupRuntimeMonthly("2026-08-20", "2026-08-21");
+        rollupMapper.rollupRuntimeYearly("2026-08-20", "2026-08-21");
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "select in_service_min, rate_pct from vqms_runtime_monthly"
+                             + " where stat_month='2026-08'"))
+        {
+            assertTrue(rs.next());
+            assertEquals(1100, rs.getInt(1));
+            assertEquals(94.828, rs.getDouble(2), 0.001, "率=1100/(1100+60)×100");
+        }
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "select in_service_min, shortfall_pct from vqms_runtime_yearly"
+                             + " where stat_year=2026"))
+        {
+            assertTrue(rs.next());
+            assertEquals(1100, rs.getInt(1));
+            assertEquals(99 - 94.828, rs.getDouble(2), 0.001);
         }
     }
 }

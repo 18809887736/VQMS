@@ -176,6 +176,7 @@ v5.0 §12.1 D8 完成标准逐条落测（DDL 依据见 v5.0 §6.2.6）：
 | `VTargetDecoder` | 纯函数 | 单元：目标值/增量两形态全分支（正式版 §2.1 例）+ 循环码 {0..5} 值域/越界=非法 + 缺 t₀；**解码差分**：Python `decode.py` vs Java，同一批 `warn_info` 原文逐条比对（§2.1 差分②）；属性（jqwik）：目标值形态编码→解码**往返可逆**（§2.1 同名属性）、增量形态同输入同 t₀ 输出恒定 | S1 |
 | `EnvelopeAggregator` | 纯函数 | 单元：min/max 窗口、空窗、单分钟窗；属性：窗口极值保持（子窗聚合区间 ⊆ 全窗聚合区间）；`TierEmpty`/`L>H` → `invalidTiers` 映射由 judge 契约测试断言（§4.2） | S1 |
 | `DefaultRegulationJudge` | 纯函数 | **契约准入 = 19 调节场景全量通过**（§4.2 manifest 映射；Stub 档先验契约形状、真实现同批判定）；`VERDICT?⟺invalidTiers` 不变式 16 组合单测沿用（§4.8） | S1 |
+| 算法注册表（选择机制，v5.0 §8.8.5） | 应用装配 | 未知 ID / 重复 ID **启动 fail-fast**（context 加载失败断言）；`V1_0`/`STUB` 按配置切换 bean 生效；未配置——S1 交付前默认 `STUB`+WARN、S1 后 fail-fast；生效 ID 进启动日志；**stub 护栏**：`isStub()` 产出拒入正式统计（S4 管线断言，防全 QUALIFIED 假数字） | S1 |
 | `YxSignalReader` | 外部读取 | IT：合成库 `points.yaml` 五类点（投退/远方就地/并网/退出原因/免考旗）；**阶跃保持语义**（取 ≤ 当分钟最近一条，正式版 §1.2）；点前无数据 → empty | S1 |
 | `GateFilter` | 应用装配 | `gate_enabled=0` 直通断言（已拍板空转）；置 1 后门控拦截行为（同 §4.2 门控端到端联调 bullet，测试本体只在该处定义） | S1/联调 |
 | `ExemptionApplier` | 纯函数 | 真值表：`PENALIZED × yx501{0,1}`、`QUALIFIED` 透传、`invalidTiers` 档透传；逐档独立（结论不跨档）——`Undecodable` 为 sealed 另一分支、编译期进不了本组件（`Judged`-only 签名，§2.1「类型堵」原则），其不经免考的分流由 Pipeline 集成断言 | **S2 前置·可即开工** |
@@ -189,7 +190,7 @@ v5.0 §12.1 D8 完成标准逐条落测（DDL 依据见 v5.0 §6.2.6）：
 
 | # | 测试策略 |
 |---|---|
-| S1 判定实现 | 契约先行（§4.2）不变——Stub 档验契约形状已跑（D9），S1 换 `DefaultRegulationJudge` 后 19 场景同批判定 + 上表 Decoder/Aggregator/Reader 三组件配套测试；解码差分必做（§2.1 差分②） |
+| S1 判定实现 | 契约先行（§4.2）不变——Stub 档验契约形状已跑（D9），S1 增 `DefaultRegulationJudge`（双注册、经 `vqms.judge.algorithm` 选择，§8.8.5）后 19 场景同批判定 + 上表 Decoder/Aggregator/Reader/算法注册表组件配套测试；解码差分必做（§2.1 差分②） |
 | S2/S3 统计落库 | **拆两半**：纯函数（ExemptionApplier/RegulationStatistics/RuntimeMinuteClassifier/RuntimeStatistics）**立即 TDD**（§2.1 打法）；**落库 DDL + rollup 集成测试**仍待 DDL 设计时补（§6.3 口径已定，无「猜」成分） |
 | S4 Quartz 编排 | Pipeline 集成 + 幂等重算测试随 DDL/编排落地补（矩阵见上） |
 | S5 策略定稿与应用 | **分轨**（v5.0 §8.7）不变：骨架/参数表/纯函数测试属 D9 已跑（§4.8）；**定稿**（政策拍板+选套经策略参数页写入）只改数据不改测试；**应用**（真实分母记账）随统计上线补端到端断言 |

@@ -164,4 +164,44 @@ class RegulationStatisticsVectorTest
         Assertions.assertThrows(IllegalArgumentException.class,
                 () -> RegulationStatistics.summarize(List.of(), Double.NaN));
     }
+
+    // ────────────────── S4 读侧：计数版入口（与逐条版同源公式） ──────────────────
+
+    @Test
+    void summarizeCounts_handVector_matchesRecordVersion()
+    {
+        // total=5, q=3, p=1, exempt=1：rate=60%，shortfall=penalized/total=20%（剔免考）
+        // 罚款 = 20×30万千瓦×0.02 = 12 分
+        RegulationStatistics.TierRateResult r = RegulationStatistics.summarizeCounts(
+                5, 3, 1, 1, 0, 300_000.0);
+        Assertions.assertEquals(60.0, r.disclosedRatePct(), EPS);
+        Assertions.assertEquals(20.0, r.penaltyShortfallPct(), EPS);
+        Assertions.assertEquals(12.0, r.penaltyScore(), EPS);
+
+        // 与逐条版交叉验证：econ 档分布 Q2/P1/E1/I1 ↔ 计数版同参
+        List<TierFinalDisposition> records = List.of(
+                d(FinalTierState.QUALIFIED, FinalTierState.QUALIFIED),
+                d(FinalTierState.QUALIFIED, FinalTierState.PENALIZED),
+                d(FinalTierState.QUALIFIED, FinalTierState.QUALIFIED),
+                d(FinalTierState.EXEMPTED, FinalTierState.EXEMPTED),
+                d(FinalTierState.INVALID, FinalTierState.INVALID));
+        RegulationStatistics.TierRateResult viaRecords = RegulationStatistics
+                .summarize(records, 300_000.0).econ();
+        RegulationStatistics.TierRateResult viaCounts = RegulationStatistics.summarizeCounts(
+                5, 2, 1, 1, 1, 300_000.0);
+        Assertions.assertEquals(viaRecords.penaltyScore(), viaCounts.penaltyScore(), EPS,
+                "两入口同源");
+        Assertions.assertEquals(viaRecords.penaltyShortfallPct(),
+                viaCounts.penaltyShortfallPct(), EPS);
+    }
+
+    @Test
+    void summarizeCounts_zeroTotal_zeroesNoNaN()
+    {
+        RegulationStatistics.TierRateResult r = RegulationStatistics.summarizeCounts(
+                0, 0, 0, 0, 0, 300_000.0);
+        Assertions.assertEquals(0.0, r.disclosedRatePct(), EPS);
+        Assertions.assertEquals(0.0, r.penaltyShortfallPct(), EPS);
+        Assertions.assertEquals(0.0, r.penaltyScore(), EPS);
+    }
 }

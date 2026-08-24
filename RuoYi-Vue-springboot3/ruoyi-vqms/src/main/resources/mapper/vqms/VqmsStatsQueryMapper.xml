@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsStatsQueryMapper">
+
+    <select id="selectRegulationMonthly" resultType="java.util.HashMap">
+        select stat_month      as statMonth,
+               algorithm_id    as algorithmId,
+               total_cmds      as totalCmds,
+               qualified_fast  as qualifiedFast,
+               penalized_fast  as penalizedFast,
+               exempted_fast   as exemptedFast,
+               invalid_fast    as invalidFast,
+               qualified_econ  as qualifiedEcon,
+               penalized_econ  as penalizedEcon,
+               exempted_econ   as exemptedEcon,
+               invalid_econ    as invalidEcon,
+               undecodable_count as undecodableCount,
+               pended_count    as pendedCount,
+               excluded_count  as excludedCount,
+               completeness_sum as completenessSum
+        from vqms_regulation_monthly
+        <where>
+            <if test="statMonth != null and statMonth != ''">stat_month = #{statMonth}</if>
+        </where>
+        order by stat_month desc
+    </select>
+
+    <select id="selectRuntimeMonthly" resultType="java.util.HashMap">
+        select stat_month        as statMonth,
+               in_service_min    as inServiceMin,
+               exit_grid_min     as exitGridMin,
+               exit_nongrid_min  as exitNonGridMin,
+               offline_min       as offlineMin,
+               rated_capacity_kw as ratedCapacityKw,
+               rate_pct          as ratePct,
+               shortfall_pct     as shortfallPct,
+               penalty_score     as penaltyScore
+        from vqms_runtime_monthly
+        <where>
+            <if test="statMonth != null and statMonth != ''">stat_month = #{statMonth}</if>
+        </where>
+        order by stat_month desc
+    </select>
+</mapper>

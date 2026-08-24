@@ -48,6 +48,22 @@ public final class RegulationStatistics
     }
 
     /**
+     * 计数版单档入口（S4 读侧：rollup 表已聚合的周期计数直接算率/罚款，与逐条版同源公式）。
+     *
+     * <p>disclosedRate = qualified/total；penaltyShortfall = penalized/total（剔免考，推荐读法）；
+     * 罚款 = 缺额 × 万千瓦 × 0.02。</p>
+     */
+    public static TierRateResult summarizeCounts(int totalCommands, int qualified, int penalized,
+            int exempt, int invalid, double ratedCapacityKw)
+    {
+        double disclosedRatePct = totalCommands == 0 ? 0.0 : qualified * 100.0 / totalCommands;
+        double shortfallPct = totalCommands == 0 ? 0.0 : penalized * 100.0 / totalCommands;
+        double penalty = shortfallPct * (ratedCapacityKw / KW_PER_WAN_KW) * SCORE_PER_POINT_PER_WAN_KW;
+        return new TierRateResult(totalCommands, qualified, penalized, exempt, invalid,
+                disclosedRatePct, shortfallPct, penalty);
+    }
+
+    /**
      * @param records          进入统计流的逐指令最终记账（分母 = 其数量）
      * @param ratedCapacityKw  额定容量（kW，项目单位规约），≥ 0
      */

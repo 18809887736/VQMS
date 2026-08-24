@@ -31,6 +31,9 @@ public class VqmsBusbarGroup implements Serializable
     /** 指示点陈旧窗口（分钟） */
     private Integer maxStalenessMinutes;
 
+    /** 该组额定容量 kW（考核罚款单价基数；NULL=待现场补录）【S2/S3 设计稿决策⑤ 2026-08-24】 */
+    private java.math.BigDecimal ratedCapacityKw;
+
     /** 备注 */
     private String remark;
 
@@ -56,6 +59,8 @@ public class VqmsBusbarGroup implements Serializable
     public void setDefaultMainBusbarNum(Long defaultMainBusbarNum) { this.defaultMainBusbarNum = defaultMainBusbarNum; }
     public Integer getMaxStalenessMinutes() { return maxStalenessMinutes; }
     public void setMaxStalenessMinutes(Integer maxStalenessMinutes) { this.maxStalenessMinutes = maxStalenessMinutes; }
+    public java.math.BigDecimal getRatedCapacityKw() { return ratedCapacityKw; }
+    public void setRatedCapacityKw(java.math.BigDecimal ratedCapacityKw) { this.ratedCapacityKw = ratedCapacityKw; }
     public String getRemark() { return remark; }
     public void setRemark(String remark) { this.remark = remark; }
     public Date getCreateTime() { return createTime; }

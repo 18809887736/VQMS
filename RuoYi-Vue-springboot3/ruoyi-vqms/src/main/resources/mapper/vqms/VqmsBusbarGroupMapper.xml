@@ -9,6 +9,7 @@
         <result property="mainIndicatorYcNum" column="main_indicator_yc_num"/>
         <result property="defaultMainBusbarNum" column="default_main_busbar_num"/>
         <result property="maxStalenessMinutes" column="max_staleness_minutes"/>
+        <result property="ratedCapacityKw" column="rated_capacity_kw"/>
         <result property="remark"         column="remark"/>
         <result property="createTime"     column="create_time"/>
         <result property="updateTime"     column="update_time"/>
@@ -16,7 +17,7 @@
 
     <sql id="selectBusbarGroupVo">
         select group_num, group_name, v_grade, main_indicator_yc_num,
-               default_main_busbar_num, max_staleness_minutes, remark,
+               default_main_busbar_num, max_staleness_minutes, rated_capacity_kw, remark,
                create_time, update_time
         from vqms_busbar_group
     </sql>
@@ -40,6 +41,7 @@
             <if test="mainIndicatorYcNum != null">main_indicator_yc_num,</if>
             <if test="defaultMainBusbarNum != null">default_main_busbar_num,</if>
             <if test="maxStalenessMinutes != null">max_staleness_minutes,</if>
+            <if test="ratedCapacityKw != null">rated_capacity_kw,</if>
             <if test="remark != null">remark,</if>
             create_time,
         </trim>
@@ -50,6 +52,7 @@
             <if test="mainIndicatorYcNum != null">#{mainIndicatorYcNum},</if>
             <if test="defaultMainBusbarNum != null">#{defaultMainBusbarNum},</if>
             <if test="maxStalenessMinutes != null">#{maxStalenessMinutes},</if>
+            <if test="ratedCapacityKw != null">#{ratedCapacityKw},</if>
             <if test="remark != null">#{remark},</if>
             sysdate(),
         </trim>
@@ -63,6 +66,7 @@
             <if test="mainIndicatorYcNum != null">main_indicator_yc_num = #{mainIndicatorYcNum},</if>
             <if test="defaultMainBusbarNum != null">default_main_busbar_num = #{defaultMainBusbarNum},</if>
             <if test="maxStalenessMinutes != null">max_staleness_minutes = #{maxStalenessMinutes},</if>
+            <if test="ratedCapacityKw != null">rated_capacity_kw = #{ratedCapacityKw},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate(),
         </trim>

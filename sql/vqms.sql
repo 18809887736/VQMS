@@ -56,6 +56,7 @@ create table vqms_busbar_group (
   main_indicator_yc_num   bigint(20)   default null            comment '该组"当前主母线号"指示点，对齐 yc_history.yc_num；未接入前为空',
   default_main_busbar_num bigint(20)   default null            comment '指示点不可用时的兜底主母线号；NULL=不兜底→该组该分钟无主母线',
   max_staleness_minutes   int          not null default 30     comment '指示点陈旧窗口(分钟)',
+  rated_capacity_kw       decimal(12,3) default null         comment '该组额定容量 kW（考核罚款单价基数：调节合格率与投运率缺额罚款共用，0.02 分/万千瓦；厂级口径=各组和；NULL=待现场补录，补录前不产罚款数）【S2/S3 设计稿决策⑤ 2026-08-24 Leo 拍板】',
   remark                  varchar(255) default null            comment '备注',
   create_time             datetime     default current_timestamp,
   update_time             datetime     default current_timestamp on update current_timestamp,
@@ -258,6 +259,7 @@ create table vqms_policy_param (
 --   * 指令级统计表（指令明细 + 日/月/年 rollup）、投运率时间记账表、预计算游标
 --     属搁置轨 S2/S3/S4，待算法定稿后设计并另出 DDL——勿从 v3.x 版本恢复旧表。
 -- （第五、六节编号保留不动，CLAUDE.md / v4.1 §6.2.1/§9.3 对"第六节 vqms_v_grade 字典"的指引仍成立。）
+--   ⬆ 指令级统计表与投运率记账表已于 2026-08-24 随 S2/S3 落地——见文末第七（S2）/第八（S3）节。
 
 
 -- ============================================================
@@ -283,3 +285,145 @@ insert into sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_cla
 values (1, '500kV',      '0', 'vqms_v_grade', '', 'danger',  'N', '0', 'admin', sysdate(), ''),
        (2, '220kV',      '1', 'vqms_v_grade', '', 'primary', 'N', '0', 'admin', sysdate(), ''),
        (3, '66kV及以下', '2', 'vqms_v_grade', '', 'info',    'N', '0', 'admin', sysdate(), '预留档：现场出现 66kV 母线时启用；容差口径为 ±1% 额定电压，异于固定 kV 档');
+
+
+-- ============================================================
+-- 七、调节合格率统计表（指令级，S2 落地 2026-08-24；设计稿四项决策 Leo 当日全批推荐项）
+--     口径：正式 v1_0 §2.7——分母=发令总次数（含 undecodable/invalid，固定分母拍板）、两档平行、免考不剔分母。
+--     列名与 statistics 包已交付纯函数同构：FinalTierState / Disposition / JudgeParams。
+--     rollup 铁律：对计数求和、绝不平均率列；率与罚款由查询层/写回快照按计数重算。
+-- ============================================================
+
+-- 7.1 指令级明细（每条入判指令一行；判定+免考+策略处置结果）
+drop table if exists vqms_regulation_cmd;
+create table vqms_regulation_cmd (
+  id                  bigint(20)   not null auto_increment comment '主键',
+  stat_date           date         not null                comment '统计归属日（t0 所在日，北京历法）',
+  warn_time           varchar(255) not null                comment '指令时间原文（对齐 vqms_command_ledger，忠实摘录）',
+  millisecond         varchar(255) default null            comment '毫秒原文（同宽防截断假碰撞，D8 教训）',
+  obj_num             bigint(20)   default null            comment '对象编号',
+  obj_num_uk          bigint(20)   generated always as (coalesce(obj_num, -1)) stored comment 'uk 归一生成列（NULL 旁路结构性消除，D8 同款）',
+  algorithm_id        varchar(16)  not null                comment '判定算法注册 ID（V1_0/STUB；§8.8.5 审计列）【决策④】',
+  t_fast_snapshot     int          not null                comment '判定时 t_fast 快照（跨整定期重算可复现、可审计）【关联决策②】',
+  fast_state          varchar(16)  not null                comment '快速档最终记账 QUALIFIED/PENALIZED/EXEMPTED/INVALID（FinalTierState）',
+  econ_state          varchar(16)  not null                comment '经济档最终记账（同上，两档独立互不隶属）',
+  completeness        decimal(5,4) not null                comment '窗口完整度 [0,1]（judge 如实上报原值）',
+  invalid_tiers       varchar(16)  default null            comment 'judge 原始按档无效标记 FAST/ECON/FAST,ECON/NULL（成因粒度，区别于 state=INVALID）',
+  undecodable_reason  varchar(32)  default null            comment '解码失败归因 CYCLE_CODE_INVALID/MISSING_T0_VOLTAGE/CORRUPTED_ENCODING；NULL=解码成功',
+  yx501_sampled       tinyint(1)   default null            comment '免考旗采样值 0/1；NULL=未采样（Undecodable 指令不走免考）',
+  disposition         varchar(32)  default null            comment '策略处置桶 COUNT_NORMAL/EXCLUDE_REPORTED/COUNT_UNQUALIFIED/PEND_MARKED（Disposition）；NULL=策略未生效（选套前只记不判）【决策①⑥】',
+  fetched_at          datetime     default current_timestamp comment '写入时间',
+  primary key (id),
+  unique key uk_cmd_result (warn_time, millisecond, obj_num_uk)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 调节合格率指令级明细（判定+免考+策略处置结果）';
+
+-- 7.2~7.4 日/月/年汇总（同构；rollup 对计数求和。率/罚款不落表——查询层或快照按计数重算；
+--   两链结构（罚款缺额剔免考与否）属 S5 待拍板，counts 已够两条链各自推导，DDL 不预支结论）
+drop table if exists vqms_regulation_daily;
+create table vqms_regulation_daily (
+  stat_date          date          not null    comment '统计日',
+  algorithm_id       varchar(16)   default null comment '周期内算法注册 ID：单一=该 ID / 混合=MIXED【决策④】',
+  total_cmds         int           not null default 0 comment '发令总次数=分母（固定分母拍板口径）',
+  qualified_fast     int           not null default 0,
+  penalized_fast     int           not null default 0,
+  exempted_fast      int           not null default 0,
+  invalid_fast       int           not null default 0,
+  qualified_econ     int           not null default 0,
+  penalized_econ     int           not null default 0,
+  exempted_econ      int           not null default 0,
+  invalid_econ       int           not null default 0,
+  undecodable_count  int           not null default 0 comment '解码失败指令数（归因分布看明细表）',
+  pended_count       int           not null default 0 comment '丁档挂起标记数【决策①呈现列】',
+  excluded_count     int           not null default 0 comment '乙档剔除披露计数——现行拍板不剔分母，此列仅披露；S5 若改分母口径再启用扣减【决策①呈现列】',
+  completeness_sum   decimal(10,4) not null default 0 comment '完整度求和（均值=本列/total_cmds 加权还原，绝不存平均率）',
+  primary key (stat_date)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 调节合格率日汇总（rollup 只存计数）';
+
+drop table if exists vqms_regulation_monthly;
+create table vqms_regulation_monthly (
+  stat_month         char(7)       not null    comment '统计月 yyyy-MM',
+  algorithm_id       varchar(16)   default null comment '周期内算法注册 ID：单一=该 ID / 混合=MIXED【决策④】',
+  total_cmds         int           not null default 0,
+  qualified_fast     int           not null default 0,
+  penalized_fast     int           not null default 0,
+  exempted_fast      int           not null default 0,
+  invalid_fast       int           not null default 0,
+  qualified_econ     int           not null default 0,
+  penalized_econ     int           not null default 0,
+  exempted_econ      int           not null default 0,
+  invalid_econ       int           not null default 0,
+  undecodable_count  int           not null default 0,
+  pended_count       int           not null default 0,
+  excluded_count     int           not null default 0,
+  completeness_sum   decimal(12,4) not null default 0,
+  primary key (stat_month)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 调节合格率月汇总（由日表 rollup）';
+
+drop table if exists vqms_regulation_yearly;
+create table vqms_regulation_yearly (
+  stat_year          smallint      not null    comment '统计年 yyyy',
+  algorithm_id       varchar(16)   default null comment '周期内算法注册 ID：单一=该 ID / 混合=MIXED【决策④】',
+  total_cmds         int           not null default 0,
+  qualified_fast     int           not null default 0,
+  penalized_fast     int           not null default 0,
+  exempted_fast      int           not null default 0,
+  invalid_fast       int           not null default 0,
+  qualified_econ     int           not null default 0,
+  penalized_econ     int           not null default 0,
+  exempted_econ      int           not null default 0,
+  invalid_econ       int           not null default 0,
+  undecodable_count  int           not null default 0,
+  pended_count       int           not null default 0,
+  excluded_count     int           not null default 0,
+  completeness_sum   decimal(14,4) not null default 0,
+  primary key (stat_year)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS 调节合格率年汇总（由月表 rollup）';
+
+
+-- ============================================================
+-- 八、投运率记账表（S3 落地 2026-08-24；正式 v1_0 §1.5 时间记账口径）
+--     分钟级分类结果不落主库（量大且可从外部源信号重算，存储切分铁律 §4），只落周期计数；
+--     率/缺额/罚款快照由 RuntimeStatistics 纯函数算出写回（单一来源），月/年由合计分钟重算。
+-- ============================================================
+
+drop table if exists vqms_runtime_daily;
+create table vqms_runtime_daily (
+  stat_date          date          not null    comment '统计日',
+  in_service_min     int           not null default 0 comment '投运分钟',
+  exit_grid_min      int           not null default 0 comment '电网原因退出分钟（免责，出分母）',
+  exit_nongrid_min   int           not null default 0 comment '非电网退出分钟（扣罚，在分母）',
+  offline_min        int           not null default 0 comment '未并网分钟（不计任何账，透传核对用）',
+  rated_capacity_kw  decimal(12,3) default null comment '计算时额定容量快照 kW（来源 vqms_busbar_group.rated_capacity_kw，厂级口径）【开放点⑤】',
+  rate_pct           decimal(6,3)  default null comment '投运率快照 %；NULL=零并网分钟（无可考核基数，非真 0%）',
+  shortfall_pct      decimal(6,3)  default null comment '缺额百分点快照 max(0,99-率)',
+  penalty_score      decimal(12,3) default null comment '考核罚款快照 分（缺额×万千瓦×0.02）',
+  primary key (stat_date)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS AVC 投运率日记账';
+
+drop table if exists vqms_runtime_monthly;
+create table vqms_runtime_monthly (
+  stat_month         char(7)       not null    comment '统计月 yyyy-MM',
+  in_service_min     int           not null default 0,
+  exit_grid_min      int           not null default 0,
+  exit_nongrid_min   int           not null default 0,
+  offline_min        int           not null default 0,
+  rated_capacity_kw  decimal(12,3) default null,
+  rate_pct           decimal(6,3)  default null,
+  shortfall_pct      decimal(6,3)  default null,
+  penalty_score      decimal(12,3) default null,
+  primary key (stat_month)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS AVC 投运率月记账（由日表对分钟计数求和后重算率）';
+
+drop table if exists vqms_runtime_yearly;
+create table vqms_runtime_yearly (
+  stat_year          smallint      not null    comment '统计年 yyyy',
+  in_service_min     int           not null default 0,
+  exit_grid_min      int           not null default 0,
+  exit_nongrid_min   int           not null default 0,
+  offline_min        int           not null default 0,
+  rated_capacity_kw  decimal(12,3) default null,
+  rate_pct           decimal(6,3)  default null,
+  shortfall_pct      decimal(6,3)  default null,
+  penalty_score      decimal(12,3) default null,
+  primary key (stat_year)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='VQMS AVC 投运率年记账（由月表对分钟计数求和后重算率）';

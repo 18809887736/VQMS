@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.vqms.management.mapper.VqmsRegulationCmdMapper">
+
+    <!-- 幂等重算：uk 冲突即覆盖（S4 第一版按日期区间重算，§12.2）；obj_num_uk 为生成列不写入 -->
+    <insert id="upsertBatch" parameterType="java.util.List">
+        insert into vqms_regulation_cmd
+          (stat_date, warn_time, millisecond, obj_num, algorithm_id, t_fast_snapshot,
+           fast_state, econ_state, completeness, invalid_tiers, undecodable_reason,
+           yx501_sampled, disposition)
+        values
+        <foreach collection="list" item="c" separator=",">
+          (#{c.statDate}, #{c.warnTime}, #{c.millisecond}, #{c.objNum}, #{c.algorithmId},
+           #{c.tFastSnapshot}, #{c.fastState}, #{c.econState}, #{c.completeness},
+           #{c.invalidTiers}, #{c.undecodableReason}, #{c.yx501Sampled}, #{c.disposition})
+        </foreach>
+        on duplicate key update
+          stat_date = values(stat_date),
+          algorithm_id = values(algorithm_id),
+          t_fast_snapshot = values(t_fast_snapshot),
+          fast_state = values(fast_state),
+          econ_state = values(econ_state),
+          completeness = values(completeness),
+          invalid_tiers = values(invalid_tiers),
+          undecodable_reason = values(undecodable_reason),
+          yx501_sampled = values(yx501_sampled),
+          disposition = values(disposition)
+    </insert>
+</mapper>

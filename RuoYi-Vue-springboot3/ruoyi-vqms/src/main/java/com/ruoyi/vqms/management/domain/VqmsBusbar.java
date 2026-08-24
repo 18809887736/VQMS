@@ -28,6 +28,9 @@ public class VqmsBusbar implements Serializable
     public Integer getVGrade() { return vGrade; }
 
     /** 所属母线组（逻辑 FK → vqms_busbar_group.group_num） */
+    /** 该母线 t0 实时电压 yc 点（增量指令算 V_target；NULL=未接入）【S4 Slice1】 */
+    private Long realtimeYcNum;
+
     private Long groupNum;
 
     /** 标称电压 kV */
@@ -58,6 +61,8 @@ public class VqmsBusbar implements Serializable
     public String getBusbarName() { return busbarName; }
     public void setBusbarName(String busbarName) { this.busbarName = busbarName; }
     public void setVGrade(Integer vGrade) { this.vGrade = vGrade; }
+    public Long getRealtimeYcNum() { return realtimeYcNum; }
+    public void setRealtimeYcNum(Long realtimeYcNum) { this.realtimeYcNum = realtimeYcNum; }
     public Long getGroupNum() { return groupNum; }
     public void setGroupNum(Long groupNum) { this.groupNum = groupNum; }
     public BigDecimal getNominalKv() { return nominalKv; }

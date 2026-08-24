@@ -10,6 +10,16 @@
 -- 与 vqms.sql 的差异说明：本文件用 ALTER/CREATE 无 DROP（存量库防误清），
 --   vqms.sql 为首初始化脚本保留 DROP IF EXISTS 风格。
 
+-- 0) S4 Slice1 配置补缺（2026-08-24）：母线 t0 实时电压点位 + 免考旗点号种子
+alter table vqms_busbar
+  add column realtime_yc_num bigint(20) default null
+  comment '该母线 t0 实时电压 yc 点（增量指令算 V_target 用，正式版 §2.1；NULL=未接入→增量指令按缺t0如实判不了）。合成 4002；真实候选 yc8 东母/yc14 西母 待现场核对【S4 Slice1 2026-08-24】';
+update vqms_busbar set realtime_yc_num = 4002 where busbar_num in (0, 1);
+
+insert into vqms_yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
+  (501, '免考旗', 'yx', '免考', '考核', 0);
+-- 501 免考旗：对端 JS 算好的全厂免考标志，阶段三后置读；gate_enabled=0（免考应用信号、非门控）。
+
 -- 1) 母线组容量列（决策⑤）
 alter table vqms_busbar_group
   add column rated_capacity_kw decimal(12,3) default null

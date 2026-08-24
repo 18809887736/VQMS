@@ -7,6 +7,7 @@
         <result property="busbarName"  column="busbar_name"/>
         <result property="vGrade"      column="v_grade"/>
         <result property="groupNum"    column="group_num"/>
+        <result property="realtimeYcNum" column="realtime_yc_num"/>
         <result property="nominalKv"   column="nominal_kv"/>
         <result property="status"      column="status"/>
         <result property="createBy"    column="create_by"/>
@@ -17,7 +18,7 @@
     </resultMap>
 
     <sql id="selectBusbarVo">
-        select busbar_num, busbar_name, v_grade, group_num, nominal_kv,
+        select busbar_num, busbar_name, v_grade, group_num, nominal_kv, realtime_yc_num,
                status, create_by, create_time, update_by, update_time, remark
         from vqms_busbar
     </sql>
@@ -40,6 +41,7 @@
             <if test="vGrade != null">v_grade,</if>
             <if test="groupNum != null">group_num,</if>
             <if test="nominalKv != null">nominal_kv,</if>
+            <if test="realtimeYcNum != null">realtime_yc_num,</if>
             <if test="status != null">status,</if>
             <if test="createBy != null and createBy != ''">create_by,</if>
             <if test="remark != null">remark,</if>
@@ -51,6 +53,7 @@
             <if test="vGrade != null">#{vGrade},</if>
             <if test="groupNum != null">#{groupNum},</if>
             <if test="nominalKv != null">#{nominalKv},</if>
+            <if test="realtimeYcNum != null">#{realtimeYcNum},</if>
             <if test="status != null">#{status},</if>
             <if test="createBy != null and createBy != ''">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
@@ -65,6 +68,7 @@
             <if test="vGrade != null">v_grade = #{vGrade},</if>
             <if test="groupNum != null">group_num = #{groupNum},</if>
             <if test="nominalKv != null">nominal_kv = #{nominalKv},</if>
+            <if test="realtimeYcNum != null">realtime_yc_num = #{realtimeYcNum},</if>
             <if test="status != null">status = #{status},</if>
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>

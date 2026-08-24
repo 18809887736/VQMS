@@ -31,16 +31,28 @@ public class YxSignalReaderImpl implements YxSignalReader
     @Override
     public Optional<Integer> heldValue(Long pointNum, LocalDateTime atMinute)
     {
-        List<YcHistory> rows = sourceReader.readYc(
-                MINUTE_TEXT.format(atMinute.minusDays(LOOKBACK_DAYS)),
-                MINUTE_TEXT.format(atMinute), pointNum);
-        return selectHeld(rows, atMinute);
+        return pickLatest(read(pointNum, atMinute), atMinute)
+                .map(r -> r.getYcData() == null ? null : r.getYcData().intValue());
     }
 
-    /** 阶跃保持选取：≤ atMinute 的最近一条（同分钟多行取后见行）；无合格行 → empty。 */
-    static Optional<Integer> selectHeld(List<YcHistory> rows, LocalDateTime atMinute)
+    @Override
+    public Optional<Double> heldDecimalValue(Long pointNum, LocalDateTime atMinute)
     {
-        Integer held = null;
+        return pickLatest(read(pointNum, atMinute), atMinute)
+                .map(YcHistory::getYcData);
+    }
+
+    private List<YcHistory> read(Long pointNum, LocalDateTime atMinute)
+    {
+        return sourceReader.readYc(
+                MINUTE_TEXT.format(atMinute.minusDays(LOOKBACK_DAYS)),
+                MINUTE_TEXT.format(atMinute), pointNum);
+    }
+
+    /** 阶跃保持行选取：≤ atMinute 的最近一条（同分钟多行取后见行）；无合格行 → empty。 */
+    static Optional<YcHistory> pickLatest(List<YcHistory> rows, LocalDateTime atMinute)
+    {
+        YcHistory held = null;
         LocalDateTime heldAt = null;
         for (YcHistory row : rows)
         {
@@ -52,9 +64,15 @@ public class YxSignalReaderImpl implements YxSignalReader
             if (heldAt == null || !t.isBefore(heldAt))
             {
                 heldAt = t;
-                held = row.getYcData() == null ? null : Integer.valueOf(row.getYcData().intValue());
+                held = row;
             }
         }
-        return Optional.ofNullable(held);
+        return Optional.ofNullable(held).filter(r -> r.getYcData() != null);
+    }
+
+    /** 兼容既有测试口径的整值选取。 */
+    static Optional<Integer> selectHeld(List<YcHistory> rows, LocalDateTime atMinute)
+    {
+        return pickLatest(rows, atMinute).map(r -> Integer.valueOf(r.getYcData().intValue()));
     }
 }

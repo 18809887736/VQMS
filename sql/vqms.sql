@@ -79,6 +79,7 @@ create table vqms_busbar (
   v_grade       tinyint       not null                comment '电压等级编码：0=500kV, 1=220kV, 2=66kV及以下(预留)，与字典 vqms_v_grade 严格对齐勿改',
   group_num     bigint(20)    default null            comment '所属母线组（逻辑FK → vqms_busbar_group.group_num）',
   nominal_kv    decimal(10,3) not null                comment '标称电压 kV（220.000 / 500.000）',
+  realtime_yc_num bigint(20)  default null            comment '该母线 t0 实时电压 yc 点（增量指令算 V_target 用，正式版 §2.1；NULL=未接入→增量指令按缺t0如实判不了）。合成 4002；真实候选 yc8 东母/yc14 西母 待现场核对【S4 Slice1 2026-08-24】',
   status        char(1)       not null default '0'    comment '状态：0=正常, 1=停用',
   create_by     varchar(64)   default ''              comment '创建者',
   create_time   datetime      default current_timestamp comment '创建时间',
@@ -90,9 +91,9 @@ create table vqms_busbar (
 
 -- 初始数据（220kV 东/西母线——对齐外部 BUSBAR 注册表样本（docs/外部DB/外部数据源.md）；
 --   warn_info 告警/状态文本对同一对母线称「正母线/副母线」，两套称呼矛盾，最终以现场确认为准；500kV 待现场补录）
-insert into vqms_busbar (busbar_num, busbar_name, v_grade, group_num, nominal_kv) values
-  (0, '220kV 东母线', 1, 0, 220.000),
-  (1, '220kV 西母线', 1, 0, 220.000);
+insert into vqms_busbar (busbar_num, busbar_name, v_grade, group_num, nominal_kv, realtime_yc_num) values
+  (0, '220kV 东母线', 1, 0, 220.000, 4002),
+  (1, '220kV 西母线', 1, 0, 220.000, 4002);
 
 
 -- 3、阈值（带生效区间，变更不回溯重算，§6.2.4）
@@ -153,7 +154,10 @@ create table vqms_yc_point_map (
 insert into vqms_yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
   (4001, '主母线号', 'busbar_id', null, null, 0),
   (3009, 'AVC投退', 'yx', '投入', '退出', 0),
-  (2003, '远方就地总', 'yx', '远方', '就地', 0);
+  (2003, '远方就地总', 'yx', '远方', '就地', 0),
+  (501, '免考旗', 'yx', '免考', '考核', 0);
+-- 501 免考旗（2026-08-24 S4 补种）：对端 JS 算好的全厂免考标志，阶段三后置读（正式版 §2.6）；
+-- gate_enabled=0：门控语义不适用（它是免考应用信号、非门控），Pipeline 直读。
 
 
 -- 5、判定整定参数（§6.2.5，v4.1 新增；RuoYi 代码生成 CRUD → /vqms/judgeParam + Redis 缓存 vqms:judgeParam:{key}）

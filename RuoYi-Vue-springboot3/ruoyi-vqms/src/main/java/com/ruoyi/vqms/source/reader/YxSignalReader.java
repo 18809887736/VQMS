@@ -16,4 +16,10 @@ public interface YxSignalReader
      * @return 该点在 atMinute 时点的阶跃保持值；该点此前无任何数据 → empty
      */
     Optional<Integer> heldValue(Long pointNum, LocalDateTime atMinute);
+
+    /**
+     * 同 {@link #heldValue} 的十进制原值版——模拟量点位（如 t₀ 实时电压 234.25 kV）用，
+     * 开关量点位走 {@link #heldValue} 即可。
+     */
+    Optional<Double> heldDecimalValue(Long pointNum, LocalDateTime atMinute);
 }

@@ -49,8 +49,8 @@ public class YxSignalReaderImpl implements YxSignalReader
                 MINUTE_TEXT.format(atMinute), pointNum);
     }
 
-    /** 阶跃保持行选取：≤ atMinute 的最近一条（同分钟多行取后见行）；无合格行 → empty。 */
-    static Optional<YcHistory> pickLatest(List<YcHistory> rows, LocalDateTime atMinute)
+    /** 阶跃保持行选取：≤ atMinute 的最近一条（同分钟多行取后见行）；无合格行 → empty。批量作业预取整日行后可复用本选取。 */
+    public static Optional<YcHistory> pickLatest(List<YcHistory> rows, LocalDateTime atMinute)
     {
         YcHistory held = null;
         LocalDateTime heldAt = null;

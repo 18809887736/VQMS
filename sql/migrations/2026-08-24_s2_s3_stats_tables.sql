@@ -16,9 +16,11 @@ alter table vqms_busbar
   comment '该母线 t0 实时电压 yc 点（增量指令算 V_target 用，正式版 §2.1；NULL=未接入→增量指令按缺t0如实判不了）。合成 4002；真实候选 yc8 东母/yc14 西母 待现场核对【S4 Slice1 2026-08-24】';
 update vqms_busbar set realtime_yc_num = 4002 where busbar_num in (0, 1);
 
-insert into vqms_yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
-  (501, '免考旗', 'yx', '免考', '考核', 0);
+insert into vqms_yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled)
+select '501', '免考旗', 'yx', '免考', '考核', 0
+where not exists (select 1 from vqms_yc_point_map where yc_num = 501);
 -- 501 免考旗：对端 JS 算好的全厂免考标志，阶段三后置读；gate_enabled=0（免考应用信号、非门控）。
+-- （NOT EXISTS 防重：兼容 IT 迁移自应用重复执行）
 
 -- 1) 母线组容量列（决策⑤）
 alter table vqms_busbar_group
@@ -40,7 +42,8 @@ create table vqms_regulation_cmd (
   completeness        decimal(5,4) not null                comment '窗口完整度 [0,1]（judge 如实上报原值）',
   invalid_tiers       varchar(16)  default null            comment 'judge 原始按档无效标记 FAST/ECON/FAST,ECON/NULL（成因粒度，区别于 state=INVALID）',
   undecodable_reason  varchar(32)  default null            comment '解码失败归因 CYCLE_CODE_INVALID/MISSING_T0_VOLTAGE/CORRUPTED_ENCODING；NULL=解码成功',
-  yx501_sampled       tinyint(1)   default null            comment '免考旗采样值 0/1；NULL=未采样（Undecodable 指令不走免考）',
+  yx501_fast          tinyint(1)   default null            comment '快速档时点免考旗 0/1（@t0+t_fast）；NULL=未采样（Undecodable 不走免考）',
+  yx501_econ          tinyint(1)   default null            comment '经济档时点免考旗 0/1（@t0+t_econ+1 窗口闭合后）；NULL=未采样',
   disposition         varchar(32)  default null            comment '策略处置桶 COUNT_NORMAL/EXCLUDE_REPORTED/COUNT_UNQUALIFIED/PEND_MARKED（Disposition）；NULL=策略未生效（选套前只记不判）【决策①⑥】',
   fetched_at          datetime     default current_timestamp comment '写入时间',
   primary key (id),

@@ -25,7 +25,8 @@ public class VqmsRegulationCmd implements Serializable
     private BigDecimal completeness;
     private String invalidTiers;
     private String undecodableReason;
-    private Integer yx501Sampled;
+    private Integer yx501Fast;
+    private Integer yx501Econ;
     private String disposition;
     private Date fetchedAt;
 
@@ -53,8 +54,10 @@ public class VqmsRegulationCmd implements Serializable
     public void setInvalidTiers(String invalidTiers) { this.invalidTiers = invalidTiers; }
     public String getUndecodableReason() { return undecodableReason; }
     public void setUndecodableReason(String undecodableReason) { this.undecodableReason = undecodableReason; }
-    public Integer getYx501Sampled() { return yx501Sampled; }
-    public void setYx501Sampled(Integer yx501Sampled) { this.yx501Sampled = yx501Sampled; }
+    public Integer getYx501Fast() { return yx501Fast; }
+    public void setYx501Fast(Integer yx501Fast) { this.yx501Fast = yx501Fast; }
+    public Integer getYx501Econ() { return yx501Econ; }
+    public void setYx501Econ(Integer yx501Econ) { this.yx501Econ = yx501Econ; }
     public String getDisposition() { return disposition; }
     public void setDisposition(String disposition) { this.disposition = disposition; }
     public Date getFetchedAt() { return fetchedAt; }

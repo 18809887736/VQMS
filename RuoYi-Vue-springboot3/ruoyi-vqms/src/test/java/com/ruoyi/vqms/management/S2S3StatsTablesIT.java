@@ -56,6 +56,7 @@ class S2S3StatsTablesIT
         String password = System.getenv("MYSQL_ROOT_PASSWORD");
         assertNotNull(password, "缺少环境变量 MYSQL_ROOT_PASSWORD");
         conn = DriverManager.getConnection(DB_URL, "root", password);
+        cleanTestData(); // 防御性预清：上次异常中断可能残留测试行（幂等重跑前提）
 
         // 迁移自应用（幂等：1050 表已存在 / 1060 列已存在 跳过）
         for (String stmt : splitStatements(migrationSql()))
@@ -91,6 +92,24 @@ class S2S3StatsTablesIT
                         sessionFactory.openSession());
     }
 
+    /** 测试行清理（哨兵族 obj_num_uk ≤ -777000 全覆盖）。setUp 预清 + tearDown 兜底。 */
+    private static void cleanTestData() throws SQLException
+    {
+        try (Statement st = conn.createStatement())
+        {
+            st.execute("delete from vqms_regulation_cmd where obj_num_uk between -777010 and -776990");
+            st.execute("delete from vqms_regulation_cmd where warn_time='2026-08-20 10:00:00'");
+            st.execute("delete from vqms_regulation_daily where stat_date between '"
+                    + TEST_DATE_A + "' and '" + TEST_DATE_A + "'");
+            st.execute("delete from vqms_runtime_daily where stat_date between '"
+                    + TEST_DATE_A + "' and '2026-08-21'");
+            st.execute("delete from vqms_runtime_monthly where stat_month = '2026-08'");
+            st.execute("delete from vqms_regulation_monthly where stat_month = '2026-08'");
+            st.execute("delete from vqms_regulation_yearly where stat_year = 2026");
+            st.execute("delete from vqms_runtime_yearly where stat_year = 2026");
+        }
+    }
+
     @AfterAll
     static void tearDown() throws Exception
     {
@@ -98,18 +117,9 @@ class S2S3StatsTablesIT
         {
             return;
         }
-        try (Statement st = conn.createStatement())
+        try
         {
-            st.execute("delete from vqms_regulation_cmd where obj_num_uk = " + SENTINEL_OBJ);
-            st.execute("delete from vqms_regulation_cmd where warn_time='2026-08-20 10:00:00'");
-            st.execute("delete from vqms_regulation_daily where stat_date between '"
-                    + TEST_DATE_A + "' and '" + TEST_DATE_A + "'");
-            st.execute("delete from vqms_runtime_daily where stat_date between '"
-                    + TEST_DATE_A + "' and '" + TEST_DATE_A + "'");
-            st.execute("delete from vqms_runtime_monthly where stat_month = '2026-08'");
-            st.execute("delete from vqms_regulation_monthly where stat_month = '2026-08'");
-            st.execute("delete from vqms_regulation_yearly where stat_year = 2026");
-            st.execute("delete from vqms_runtime_yearly where stat_year = 2026");
+            cleanTestData();
         }
         finally
         {

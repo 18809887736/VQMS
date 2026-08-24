@@ -142,7 +142,8 @@ class RegulationPipelineTest
         assertEquals(0, new BigDecimal("1.0").compareTo(row.getCompleteness()));
         assertNull(row.getInvalidTiers());
         assertNull(row.getUndecodableReason());
-        assertEquals(0, row.getYx501Sampled());
+        assertEquals(0, row.getYx501Fast());
+        assertEquals(0, row.getYx501Econ());
         assertNull(row.getDisposition(), "选套前策略处置恒 NULL【默认口径④】");
     }
 

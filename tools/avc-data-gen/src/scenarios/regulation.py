@@ -200,7 +200,8 @@ class S08LowBoundary:
     def build(self, cfg):
         t0 = at_minute(cfg.base_date, hour=10, minute=0)
         fast = [(226, 225)] * 4     # L=225, H=226，V_target=225 落 L 边界 → 合格
-        econ = _MISS_ABOVE_ECON    # 漂高不夹
+        # ⚠ 勿复用 _MISS_ABOVE_ECON(226,225)：本场景 V_target=225，该向量恰好边界夹住（2026-08-24 IT 准入抓出）
+        econ = [(228, 227)]        # 漂高不夹：L=227 > V_target=225
         curve = _win_curve(cfg, t0,
                            fast_pts=fast, econ_pts=econ)
         return ScenarioBundle(self.id, "偏低边界（L=V_target 测≤闭区间）", cfg.base_date,

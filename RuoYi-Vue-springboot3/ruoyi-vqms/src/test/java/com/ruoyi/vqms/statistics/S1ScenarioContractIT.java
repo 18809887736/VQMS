@@ -250,19 +250,21 @@ class S1ScenarioContractIT
             RegulationOutcome.Judged j = assertInstanceOf(RegulationOutcome.Judged.class, outcome,
                     id + " 非 SKIP 期望应产出 Judged");
 
-            // 免考旗真实值（指令时点阶跃保持）：本批合成数据窗口内恒定，取 t₀ 时点
+            // 免考旗逐档时点采样（⚠ UNVERIFIED-口径，由 S05~S07 中途跳变数据反推）：
+            // 快档 @t₀+t_fast、经济档 @窗口闭合 t₀+t_econ+1
             JudgeInput input = inputs.stream()
                     .filter(in -> dayById.get(id).equals(in.scenarioDate()))
                     .findFirst().orElseThrow();
-            int yx501 = heldExemptFlag(input.t0());
+            int fastFlag = heldExemptFlag(input.t0().plusMinutes(PRODUCTION_PARAMS.tFast()));
+            int econFlag = heldExemptFlag(input.t0().plusMinutes(PRODUCTION_PARAMS.tEcon() + 1L));
 
             assertTierVerdict(id, "fast", expected.getString("fast"), j.fast());
             assertTierVerdict(id, "econ", expected.getString("econ"), j.econ());
 
             // 免考层两段式（正式版 §2.6 后置应用，结论不跨档）
-            TierFinalDisposition disposition = ExemptionApplier.apply(j, yx501);
-            assertTierFinal(id, "fast", expected.getString("fast"), yx501, disposition.fast());
-            assertTierFinal(id, "econ", expected.getString("econ"), yx501, disposition.econ());
+            TierFinalDisposition disposition = ExemptionApplier.apply(j, fastFlag, econFlag);
+            assertTierFinal(id, "fast", expected.getString("fast"), fastFlag, disposition.fast());
+            assertTierFinal(id, "econ", expected.getString("econ"), econFlag, disposition.econ());
         }
     }
 

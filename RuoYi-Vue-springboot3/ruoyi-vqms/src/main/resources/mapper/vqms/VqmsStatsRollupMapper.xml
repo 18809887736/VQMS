@@ -74,7 +74,7 @@
                sum(undecodable_count), sum(pended_count), sum(excluded_count), sum(completeness_sum)
         from vqms_regulation_monthly
         where stat_month between substring(#{startDate}, 1, 7) and substring(#{endDate}, 1, 7)
-        group by substring(stat_month, 1, 4)
+        group by cast(substring(stat_month, 1, 4) as signed)
         on duplicate key update
           algorithm_id = values(algorithm_id), total_cmds = values(total_cmds),
           qualified_fast = values(qualified_fast), penalized_fast = values(penalized_fast),
@@ -125,7 +125,7 @@
                sum(penalty_score)
         from vqms_runtime_monthly
         where stat_month between substring(#{startDate}, 1, 7) and substring(#{endDate}, 1, 7)
-        group by substring(stat_month, 1, 4)
+        group by cast(substring(stat_month, 1, 4) as signed)
         on duplicate key update
           in_service_min = values(in_service_min), exit_grid_min = values(exit_grid_min),
           exit_nongrid_min = values(exit_nongrid_min), offline_min = values(offline_min),

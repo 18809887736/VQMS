@@ -208,13 +208,17 @@ public class RegulationPipeline
             row.setObjNum(c.getObjNum());
             row.setAlgorithmId("V1_0");
             row.settFastSnapshot(params.tFast());
-            row.setYx501Sampled(heldFlag(EXEMPT_FLAG_YC, t0));
+            // 逐档时点采样（⚠ UNVERIFIED-口径：快档@t₀+t_fast、经济档@窗口闭合 t₀+t_econ+1，
+            // 由合成场景 S05~S07 中途跳变数据反推，待对端确认）；缺失从严按 0（默认口径③）
+            Integer fastFlag = heldFlag(EXEMPT_FLAG_YC, t0.plusMinutes(params.tFast()));
+            Integer econFlag = heldFlag(EXEMPT_FLAG_YC, t0.plusMinutes(params.tEcon() + 1L));
+            row.setYx501Fast(fastFlag);
+            row.setYx501Econ(econFlag);
 
             if (outcome instanceof RegulationOutcome.Judged j)
             {
-                // 免考旗缺失从严按 0（默认口径③，⚠ UNVERIFIED-口径见类注）
                 TierFinalDisposition disp = ExemptionApplier.apply(j,
-                        row.getYx501Sampled() == null ? 0 : row.getYx501Sampled());
+                        fastFlag == null ? 0 : fastFlag, econFlag == null ? 0 : econFlag);
                 row.setFastState(disp.fast().name());
                 row.setEconState(disp.econ().name());
                 row.setCompleteness(BigDecimal.valueOf(j.completeness()));

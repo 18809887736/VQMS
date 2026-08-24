@@ -1,0 +1,122 @@
+[
+ {
+  "scenario": "S01",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S02",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S03",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S04",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S05",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S06",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S07",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S08",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22500.",
+  "realtime_kv": 234.25,
+  "py_v_target": 225.0
+ },
+ {
+  "scenario": "S09",
+  "warn_content": "收到远方遥调执行指令:辽宁母线电压增量指令编码值处理,2202.",
+  "realtime_kv": 234.25,
+  "py_v_target": 234.45
+ },
+ {
+  "scenario": "S10",
+  "warn_content": "收到远方遥调执行指令:辽宁母线电压增量指令编码值处理,1202.",
+  "realtime_kv": 234.25,
+  "py_v_target": 234.05
+ },
+ {
+  "scenario": "S11",
+  "warn_content": "收到远方遥调执行指令:辽宁母线电压增量指令编码值处理,2202.",
+  "realtime_kv": null,
+  "py_v_target": null
+ },
+ {
+  "scenario": "S12",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,abc.",
+  "realtime_kv": 234.25,
+  "py_v_target": null
+ },
+ {
+  "scenario": "S13",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S14",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S15",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S16",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S17",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S17",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22500.",
+  "realtime_kv": 234.25,
+  "py_v_target": 225.0
+ },
+ {
+  "scenario": "S18",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": 234.25,
+  "py_v_target": 223.15
+ },
+ {
+  "scenario": "S19",
+  "warn_content": "收到远方遥调执行指令:主省220KV目标值,22315.",
+  "realtime_kv": null,
+  "py_v_target": 223.15
+ }
+]

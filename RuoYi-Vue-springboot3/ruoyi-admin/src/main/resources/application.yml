@@ -13,6 +13,13 @@ ruoyi:
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
 
+# VQMS 配置
+vqms:
+  judge:
+    # 调节判定算法实现选择（部署级，改配置+重启生效；v5.0 §8.8.5）
+    # V1_0=正式包络判定（S1）/ STUB=确定性占位（D9）——未配置或未知 ID 启动即失败
+    algorithm: STUB
+
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080

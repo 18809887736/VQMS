@@ -31,11 +31,13 @@ class D5PermsConsistencyTest
             "vqms:threshold:edit", "vqms:threshold:remove", "vqms:threshold:export",
             "vqms:judgeparam:list", "vqms:judgeparam:add", "vqms:judgeparam:edit",
             "vqms:judgeparam:remove",
+            "vqms:policyparam:list", "vqms:policyparam:apply",
             "vqms:vqms_busbar:list");
 
     private static final Class<?>[] CONTROLLERS = {
             VqmsCurveController.class, VqmsStatsController.class, VqmsAvcController.class,
-            VqmsThresholdController.class, VqmsBusbarController.class, VqmsJudgeParamController.class };
+            VqmsThresholdController.class, VqmsBusbarController.class, VqmsJudgeParamController.class,
+            VqmsPolicyParamController.class };
 
     @Test
     void assert_控制器perms完全覆盖权威清单() throws Exception

@@ -93,3 +93,11 @@ insert into sys_role_menu values('2', '2042');
 insert into sys_role_menu values('2', '2043');
 insert into sys_role_menu values('2', '2044');
 insert into sys_role_menu values('2', '2045');
+
+
+-- ---------- 策略参数（S5 UI 选套页，2026-08-24：§8.7 策略参数页 / §10.1） ----------
+-- perms 全小写 vqms:policyparam:*；唯一写路径 apply（无逐行 add/edit/remove，杜绝绕过预设）
+insert into sys_menu values('2046', '策略参数', '2030', '3', 'policyparam', 'vqms/policyparam/index', '', 'VqmsPolicyParam', 1, 0, 'C', '0', '0', 'vqms:policyparam:list', 'checkbox', 'admin', sysdate(), '', null, '数据不可用策略选套页（甲乙丙丁，选套值留空待政策拍板）');
+insert into sys_menu values('2047', '策略选套应用', '2046', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:policyparam:apply', '#', 'admin', sysdate(), '', null, '');
+insert into sys_role_menu values('2', '2046');
+insert into sys_role_menu values('2', '2047');

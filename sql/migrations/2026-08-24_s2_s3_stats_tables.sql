@@ -155,3 +155,14 @@ select 'VQMS 统计日重算（调节+投运率+rollup）', 'DEFAULT', 'vqmsStat
         '0 0 3 * * ?', '3', '1', '1', 'admin', sysdate(),
         '每日 03:00 重算昨日全链；默认暂停——统计上线拍板后由管理员启用（防上线前静默产数）'
 where not exists (select 1 from sys_job where invoke_target = 'vqmsStatsTask.recomputeYesterday()');
+
+-- 5) S5 策略参数页菜单（NOT EXISTS 防重，兼容 IT 迁移自应用重复执行）
+insert into sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+select '策略参数', '2030', '3', 'policyparam', 'vqms/policyparam/index', '', 'VqmsPolicyParam', 1, 0, 'C', '0', '0', 'vqms:policyparam:list', 'checkbox', 'admin', sysdate(), '', null, '数据不可用策略选套页（甲乙丙丁，选套值留空待政策拍板）'
+where not exists (select 1 from sys_menu where perms = 'vqms:policyparam:list');
+insert into sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, update_by, update_time, remark)
+select '策略选套应用', (select menu_id from sys_menu where perms = 'vqms:policyparam:list'), '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:policyparam:apply', '#', 'admin', sysdate(), '', null, ''
+where not exists (select 1 from sys_menu where perms = 'vqms:policyparam:apply');
+insert into sys_role_menu (role_id, menu_id)
+select '2', menu_id from sys_menu where perms in ('vqms:policyparam:list', 'vqms:policyparam:apply')
+  and not exists (select 1 from sys_role_menu rm where rm.menu_id = sys_menu.menu_id and rm.role_id = '2');

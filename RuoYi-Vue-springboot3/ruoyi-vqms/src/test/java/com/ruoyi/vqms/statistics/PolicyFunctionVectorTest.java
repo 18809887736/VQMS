@@ -31,7 +31,8 @@ class PolicyFunctionVectorTest
     private static final RegulationOutcome TIER_INVALID = judged(1.0, Set.of(Tier.FAST));
     private static final RegulationOutcome ZERO_BOTH_INVALID = judged(0.0, Set.of(Tier.FAST, Tier.ECON));
 
-    /** 四套候选配置向量（策略文档 §3.2 / §4.2），按需构造 */
+    /** 四套候选配置向量（策略文档 §3.2 / §4.2）——S5 起改引 main 侧 {@link PolicyPreset} 消重
+     *  （§8.7：预设映射唯一权威 = main 侧枚举，测试只引用不复制）。 */
     private enum Candidate
     {
         JIA,
@@ -43,18 +44,10 @@ class PolicyFunctionVectorTest
         {
             return switch (this)
             {
-                // 甲（宽松跳过）：部分缺用剩余正常记账；判不了/档无效剔除+上报
-                case JIA -> new PolicyConfig(Disposition.EXCLUDE_REPORTED, Disposition.EXCLUDE_REPORTED,
-                        Disposition.COUNT_NORMAL, null);
-                // 乙（推荐·稳健）：部分缺阈值剔除（建议 50% 可整定）+ 计数；其余同甲
-                case YI_50 -> new PolicyConfig(Disposition.EXCLUDE_REPORTED, Disposition.EXCLUDE_REPORTED,
-                        Disposition.EXCLUDE_REPORTED, 50);
-                // 丙（严）：有缺失即计不合格
-                case BING -> new PolicyConfig(Disposition.COUNT_UNQUALIFIED, Disposition.COUNT_UNQUALIFIED,
-                        Disposition.COUNT_UNQUALIFIED, null);
-                // 丁（透明）：跳过 + 标记挂起人工后审
-                case DING -> new PolicyConfig(Disposition.PEND_MARKED, Disposition.PEND_MARKED,
-                        Disposition.PEND_MARKED, null);
+                case JIA -> PolicyPreset.JIA.config();
+                case YI_50 -> PolicyPreset.YI.config();
+                case BING -> PolicyPreset.BING.config();
+                case DING -> PolicyPreset.DING.config();
             };
         }
     }

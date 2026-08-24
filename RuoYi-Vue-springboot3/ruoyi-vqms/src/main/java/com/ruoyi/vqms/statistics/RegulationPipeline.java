@@ -26,6 +26,7 @@ import com.ruoyi.vqms.management.mapper.VqmsBusbarMapper;
 import com.ruoyi.vqms.management.mapper.VqmsCommandLedgerMapper;
 import com.ruoyi.vqms.management.mapper.VqmsRegulationCmdMapper;
 import com.ruoyi.vqms.management.service.VqmsJudgeParamService;
+import com.ruoyi.vqms.management.service.VqmsPolicyParamService;
 import com.ruoyi.vqms.source.model.HisCurveSv;
 import com.ruoyi.vqms.source.reader.MinuteRounder;
 import com.ruoyi.vqms.source.reader.SourceReader;
@@ -63,11 +64,13 @@ public class RegulationPipeline
     private final VqmsBusbarMapper busbarMapper;
     private final VqmsRegulationCmdMapper cmdMapper;
     private final VqmsJudgeParamService judgeParamService;
+    private final VqmsPolicyParamService policyParamService;
 
     public RegulationPipeline(VqmsCommandLedgerMapper ledgerMapper, SourceReader sourceReader,
             GateFilter gateFilter, RegulationJudge judge, YxSignalReader yxReader,
             VqmsBusbarGroupMapper groupMapper, VqmsBusbarMapper busbarMapper,
-            VqmsRegulationCmdMapper cmdMapper, VqmsJudgeParamService judgeParamService)
+            VqmsRegulationCmdMapper cmdMapper, VqmsJudgeParamService judgeParamService,
+            VqmsPolicyParamService policyParamService)
     {
         this.ledgerMapper = ledgerMapper;
         this.sourceReader = sourceReader;
@@ -78,6 +81,7 @@ public class RegulationPipeline
         this.busbarMapper = busbarMapper;
         this.cmdMapper = cmdMapper;
         this.judgeParamService = judgeParamService;
+        this.policyParamService = policyParamService;
     }
 
     /** 一次重算的计数披露（门控拦截/脏时间/stub 拦截照实上报，不静默）。 */
@@ -215,6 +219,9 @@ public class RegulationPipeline
             row.setYx501Fast(fastFlag);
             row.setYx501Econ(econFlag);
 
+            // 策略处置（S5 选套后生效；表空=未选套 → disposition NULL 只记不判）
+            Optional<PolicyConfig> policyConfig = policyParamService.loadConfig();
+
             if (outcome instanceof RegulationOutcome.Judged j)
             {
                 TierFinalDisposition disp = ExemptionApplier.apply(j,
@@ -223,6 +230,7 @@ public class RegulationPipeline
                 row.setEconState(disp.econ().name());
                 row.setCompleteness(BigDecimal.valueOf(j.completeness()));
                 row.setInvalidTiers(joinTiers(j.invalidTiers()));
+                row.setDisposition(dispositionOf(outcome, policyConfig));
             }
             else
             {
@@ -232,6 +240,7 @@ public class RegulationPipeline
                 row.setEconState(FinalTierState.INVALID.name()); // 整指令占位（allInvalid 语义）
                 row.setCompleteness(BigDecimal.ZERO);
                 row.setUndecodableReason(u.reason().name());
+                row.setDisposition(dispositionOf(outcome, policyConfig));
             }
             rows.add(row);
         }
@@ -245,6 +254,14 @@ public class RegulationPipeline
                 dirtyTimeSkipped);
         return new PipelineResult(commands.size(), rows.size(), gateSkipped,
                 dirtyTimeSkipped, undecodableCount, 0);
+    }
+
+    /** 策略评估：未选套（配置缺）→ null；选套 → Disposition 枚举名。 */
+    private static String dispositionOf(RegulationOutcome outcome,
+            Optional<PolicyConfig> policyConfig)
+    {
+        return policyConfig.map(cfg -> DataUnavailabilityPolicy.evaluate(outcome, cfg).name())
+                .orElse(null);
     }
 
     private record T0Command(VqmsCommandLedger command, LocalDateTime t0)

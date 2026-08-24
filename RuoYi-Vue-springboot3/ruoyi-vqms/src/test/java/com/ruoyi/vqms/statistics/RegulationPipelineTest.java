@@ -19,6 +19,7 @@ import com.ruoyi.vqms.management.mapper.VqmsBusbarMapper;
 import com.ruoyi.vqms.management.mapper.VqmsCommandLedgerMapper;
 import com.ruoyi.vqms.management.mapper.VqmsRegulationCmdMapper;
 import com.ruoyi.vqms.management.service.VqmsJudgeParamService;
+import com.ruoyi.vqms.management.service.VqmsPolicyParamService;
 import com.ruoyi.vqms.source.model.HisCurveSv;
 import com.ruoyi.vqms.source.reader.SourceReader;
 import com.ruoyi.vqms.source.reader.YxSignalReader;
@@ -55,6 +56,7 @@ class RegulationPipelineTest
     private final VqmsBusbarMapper busbarMapper = mock(VqmsBusbarMapper.class);
     private final VqmsRegulationCmdMapper cmdMapper = mock(VqmsRegulationCmdMapper.class);
     private final VqmsJudgeParamService paramService = mock(VqmsJudgeParamService.class);
+    private final VqmsPolicyParamService policyParamService = mock(VqmsPolicyParamService.class);
 
     private RegulationPipeline pipeline;
 
@@ -62,9 +64,11 @@ class RegulationPipelineTest
     void setUp()
     {
         pipeline = new RegulationPipeline(ledgerMapper, sourceReader, gateFilter, judge,
-                yxReader, groupMapper, busbarMapper, cmdMapper, paramService);
+                yxReader, groupMapper, busbarMapper, cmdMapper, paramService, policyParamService);
         when(paramService.getInt("t_fast")).thenReturn(4);
         when(paramService.getInt("t_econ")).thenReturn(5);
+        // 默认未选套：disposition NULL（选套前只记不判）
+        when(policyParamService.loadConfig()).thenReturn(java.util.Optional.empty());
 
         VqmsBusbar busbar = new VqmsBusbar();
         busbar.setBusbarNum(0L);
@@ -111,7 +115,7 @@ class RegulationPipelineTest
     {
         RegulationPipeline stubPipeline = new RegulationPipeline(ledgerMapper, sourceReader,
                 gateFilter, new StubRegulationJudge(), yxReader, groupMapper, busbarMapper,
-                cmdMapper, paramService);
+                cmdMapper, paramService, policyParamService);
         when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString()))
                 .thenReturn(List.of(ledger(T0_TEXT, TARGET_TEXT, 0L)));
 
@@ -210,6 +214,76 @@ class RegulationPipelineTest
         assertEquals(1, r.gateSkipped());
         assertEquals(0, r.written());
         verify(cmdMapper, never()).upsertBatch(any()); // 默认口径②：拦截不进分母
+    }
+
+    @Test
+    void policySelected_dispositionEvaluatedAndPersisted()
+    {
+        // S5 选套乙：partial_missing=EXCLUDE_REPORTED@50——completeness=0.4 的指令剔除+计数
+        when(policyParamService.loadConfig()).thenReturn(java.util.Optional.of(
+                PolicyPreset.YI.config()));
+        // 窗口只余 2/5 分钟 → completeness 0.4（可用度 40%）< 阈值 50 → 触发剔除+计数
+        List<HisCurveSv> partial = new java.util.ArrayList<>();
+        for (int offset = 1; offset <= 2; offset++)
+        {
+            HisCurveSv r3 = new HisCurveSv();
+            r3.setSaveTime(String.format("2026-03-23 10:%02d:00.000", offset));
+            r3.setBusbarNum(0L);
+            r3.setHighSV(new BigDecimal(225));
+            r3.setLowSV(new BigDecimal(222));
+            partial.add(r3);
+        }
+        when(sourceReader.readCurve(anyString(), anyString(), eq(0L))).thenReturn(partial);
+        when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString()))
+                .thenReturn(List.of(ledger(T0_TEXT, TARGET_TEXT, 0L)));
+
+        pipeline.recompute(DAY, DAY);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<VqmsRegulationCmd>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cmdMapper).upsertBatch(captor.capture());
+        assertEquals("EXCLUDE_REPORTED", captor.getValue().get(0).getDisposition(),
+                "选套乙：可用度 40% < 50% 阈值 → 剔除+计数");
+    }
+
+    @Test
+    void allFourPresets_sameInput_differentDisposition_oneClickSwitch()
+    {
+        // 「一键切换」语义：同一条部分缺失指令（可用度 40%），仅换策略配置即得四种处置——
+        // 甲=正常记账 / 乙=剔除计数 / 丙=计不合格 / 丁=挂起标记
+        // 偏移取 {1,5}：两窗都有行（不触发 invalidTiers），缺 3 分钟 → completeness 0.4
+        List<HisCurveSv> partial = new java.util.ArrayList<>();
+        for (int offset : new int[] {1, 5})
+        {
+            HisCurveSv r4 = new HisCurveSv();
+            r4.setSaveTime(String.format("2026-03-23 10:%02d:00.000", offset));
+            r4.setBusbarNum(0L);
+            r4.setHighSV(new BigDecimal(225));
+            r4.setLowSV(new BigDecimal(222));
+            partial.add(r4);
+        }
+        when(sourceReader.readCurve(anyString(), anyString(), eq(0L))).thenReturn(partial);
+
+        String[][] matrix = {
+                {"JIA", "COUNT_NORMAL"},
+                {"YI", "EXCLUDE_REPORTED"},
+                {"BING", "COUNT_UNQUALIFIED"},
+                {"DING", "PEND_MARKED"},
+        };
+        for (String[] m : matrix)
+        {
+            when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString()))
+                    .thenReturn(List.of(ledger(T0_TEXT, TARGET_TEXT, 0L)));
+            when(policyParamService.loadConfig())
+                    .thenReturn(java.util.Optional.of(PolicyPreset.valueOf(m[0]).config()));
+            org.mockito.Mockito.clearInvocations(cmdMapper);
+
+            pipeline.recompute(DAY, DAY);
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<VqmsRegulationCmd>> captor = ArgumentCaptor.forClass(List.class);
+            verify(cmdMapper).upsertBatch(captor.capture());
+            assertEquals(m[1], captor.getValue().get(0).getDisposition(),
+                    "预设 " + m[0] + " 下同输入应落 " + m[1]);
+        }
     }
 
     @Test

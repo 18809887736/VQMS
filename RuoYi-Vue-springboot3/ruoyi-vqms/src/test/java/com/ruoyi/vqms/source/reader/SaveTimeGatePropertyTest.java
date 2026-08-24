@@ -117,12 +117,15 @@ class SaveTimeGatePropertyTest
     void prop_过滤恰好保留目标区间内的行(@ForAll("times") LocalDateTime start, @ForAll @IntRange(min = 0, max = 1440) int windowMinutes,
             @ForAll @IntRange(min = -2, max = 1442) int rowOffsetMinutes)
     {
-        LocalDateTime end = start.plusMinutes(windowMinutes);
-        LocalDateTime row = start.plusMinutes(rowOffsetMinutes);
+        // 边界截到秒再喂两侧：闸门入参经 MINUTE_TEXT 文本天然丢亚秒，oracle 若用纳秒精度
+        // 比较，边界行（如 start 带 1ns）会与实现判定错位（2026-08-24 S3 回归踩中，D4 潜伏修）
+        LocalDateTime startSec = start.truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        LocalDateTime end = startSec.plusMinutes(windowMinutes);
+        LocalDateTime row = startSec.plusMinutes(rowOffsetMinutes);
         String raw = toRaw(row, 3);
-        boolean inTarget = !MinuteRounder.round(row).isBefore(start) && !MinuteRounder.round(row).isAfter(end);
-        List<String> kept = SaveTimeGate.filter(List.of(raw), s -> s, start.format(MINUTE_TEXT), end.format(MINUTE_TEXT));
+        boolean inTarget = !MinuteRounder.round(row).isBefore(startSec) && !MinuteRounder.round(row).isAfter(end);
+        List<String> kept = SaveTimeGate.filter(List.of(raw), s -> s, startSec.format(MINUTE_TEXT), end.format(MINUTE_TEXT));
         Assertions.assertEquals(inTarget ? 1 : 0, kept.size(),
-                () -> "raw=" + raw + " rounded=" + MinuteRounder.round(row) + " window=[" + start + "," + end + "]");
+                () -> "raw=" + raw + " rounded=" + MinuteRounder.round(row) + " window=[" + startSec + "," + end + "]");
     }
 }

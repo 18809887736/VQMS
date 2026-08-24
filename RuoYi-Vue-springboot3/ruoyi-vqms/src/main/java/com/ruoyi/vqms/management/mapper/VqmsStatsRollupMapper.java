@@ -19,7 +19,7 @@ public interface VqmsStatsRollupMapper
     /** 调节月汇总 → 年汇总 */
     int rollupRegulationYearly(@Param("startDate") String startDate, @Param("endDate") String endDate);
 
-    /** 投运率日记账 → 月记账（分钟计数求和；率快照由调用方按合计分钟重算，本语句置 NULL 待写回） */
+    /** 投运率日记账 → 月记账（分钟计数求和；率/缺额在 SQL 内按合计分钟重算，罚款按日累加） */
     int rollupRuntimeMonthly(@Param("startDate") String startDate, @Param("endDate") String endDate);
 
     /** 投运率月记账 → 年记账 */

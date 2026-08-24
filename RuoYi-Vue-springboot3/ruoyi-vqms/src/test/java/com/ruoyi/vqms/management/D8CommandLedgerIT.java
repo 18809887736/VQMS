@@ -36,7 +36,7 @@ import com.ruoyi.vqms.source.reader.SourceReader;
 /**
  * D8 集成测试：指令流水账 vqms_command_ledger（v5.0 §12.1 完成标准 / 测试方案 §4.7）。
  *
- * <p>双数据源直连：外部源 qheatavchisdb @3306（只读，VQMS_AVC_TEST_USER/PASSWORD）+
+ * <p>双数据源直连：外部源 qheatavchisdb @3306（只读，VQMS_AVC_USER/PASSWORD）+
  * 主库 ry_vqms @13306（MYSQL_ROOT_PASSWORD）。不经 RuoYi @DataSource 路由（同 D1 IT——
  * 该路由是 RuoYi 既有机制）；Mysql57SourceReader 的 mapper 绑外部源 SSF、流水账 mapper
  * 绑主库 SSF，服务真实串起「读外部源 → 摘录落主库」全程。</p>
@@ -77,9 +77,9 @@ class D8CommandLedgerIT
             ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
             ds.setUrl(SOURCE_URL);
             String user = java.util.Objects.requireNonNull(
-                    System.getenv("VQMS_AVC_TEST_USER"), "缺少 VQMS_AVC_TEST_USER");
+                    System.getenv("VQMS_AVC_USER"), "缺少 VQMS_AVC_USER");
             String password = java.util.Objects.requireNonNull(
-                    System.getenv("VQMS_AVC_TEST_PASSWORD"), "缺少 VQMS_AVC_TEST_PASSWORD");
+                    System.getenv("VQMS_AVC_PASSWORD"), "缺少 VQMS_AVC_PASSWORD");
             ds.setUsername(user);
             ds.setPassword(password);
             return ds;

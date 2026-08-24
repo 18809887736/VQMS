@@ -55,8 +55,8 @@ class D4GateScenarioIT
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
         ds.setUrl(DB_URL);
-        ds.setUsername(requiredEnv("VQMS_AVC_TEST_USER"));
-        ds.setPassword(requiredEnv("VQMS_AVC_TEST_PASSWORD"));
+        ds.setUsername(requiredEnv("VQMS_AVC_USER"));
+        ds.setPassword(requiredEnv("VQMS_AVC_PASSWORD"));
 
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
         factoryBean.setDataSource(ds);

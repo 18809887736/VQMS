@@ -79,10 +79,10 @@ class S1ScenarioContractIT
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
         ds.setUrl(DB_URL);
-        String user = System.getenv("VQMS_AVC_TEST_USER");
-        String password = System.getenv("VQMS_AVC_TEST_PASSWORD");
-        assertNotNull(user, "缺少环境变量 VQMS_AVC_TEST_USER");
-        assertNotNull(password, "缺少环境变量 VQMS_AVC_TEST_PASSWORD");
+        String user = System.getenv("VQMS_AVC_USER");
+        String password = System.getenv("VQMS_AVC_PASSWORD");
+        assertNotNull(user, "缺少环境变量 VQMS_AVC_USER");
+        assertNotNull(password, "缺少环境变量 VQMS_AVC_PASSWORD");
         ds.setUsername(user);
         ds.setPassword(password);
 

@@ -105,7 +105,7 @@ S11 被故意排除：它是"解码失败/SKIP"分支，无 v_target 可核对�
 ### 5.3 数据库连接
 
 - **本次**: `qheatavchisdb`（真实库，Leo 指令）
-- **凭据**: 环境变量 `VQMS_AVC_TEST_USER` / `VQMS_AVC_TEST_PASSWORD`（默认 root/syth7777）
+- **凭据**: 环境变量 `VQMS_AVC_USER` / `VQMS_AVC_PASSWORD`（默认 root/syth7777）
 
 ---
 

@@ -4,7 +4,7 @@
 > 前身 `VQMS_测试方案_v1_0.md` 已于 2026-08-17 删除（Testcontainers 依赖与开发机无 Docker 冲突）；本文件是重写版，非增量修订。
 > 创建日期：2026-08-18。
 >
-> **2026-08-22 勘误（Leo 拍板①按实况同步，不升版本号）**：§3 及各处库名/凭证变量名对齐 D1~D6 实际落地——原规划的替身库 `vqms_avc_test` 与独立主库测试库 `ry_vqms_test` **均未建立**；实际口径 = 外部源侧直连 `qheatavchisdb`（26 场景合成数据当前即灌于此，D1 起 Leo 指令）、管理侧共享 `ry_vqms`（行级自清理，无每轮重置脚本）。变量名：外部源 `VQMS_AVC_TEST_USER/PASSWORD`、主库 `MYSQL_ROOT_PASSWORD`、本机起后端另需 `VQMS_REDIS_PASSWORD`（D6）。**`ry_vqms` 转生产库前，管理侧 IT 必须先改打独立测试库**（D5MenuIT 的幂等逻辑会清 2000~2099 菜单段）。
+> **2026-08-22 勘误（Leo 拍板①按实况同步，不升版本号）**：§3 及各处库名/凭证变量名对齐 D1~D6 实际落地——原规划的替身库 `vqms_avc_test` 与独立主库测试库 `ry_vqms_test` **均未建立**；实际口径 = 外部源侧直连 `qheatavchisdb`（26 场景合成数据当前即灌于此，D1 起 Leo 指令）、管理侧共享 `ry_vqms`（行级自清理，无每轮重置脚本）。变量名：外部源 `VQMS_AVC_USER/PASSWORD`、主库 `MYSQL_ROOT_PASSWORD`、本机起后端另需 `VQMS_REDIS_PASSWORD`（D6）。**`ry_vqms` 转生产库前，管理侧 IT 必须先改打独立测试库**（D5MenuIT 的幂等逻辑会清 2000~2099 菜单段）。
 
 ## 0. 相对 v1_0 的关键变更（先读，防拿旧口径套新方案）
 
@@ -81,7 +81,7 @@ TDD 按「红-绿循环成本」分层适用，**不是全域套用**：
 | 主库 `ry_vqms`（共享）@ 10.0.0.9:13306（vqms-mysql 容器） | D2/D5/D7/D8/D9 管理侧集成（独立测试库 `ry_vqms_test` 未建立——2026-08-22 勘误；**转生产前 IT 必须先换独立测试库**，D5MenuIT 会清 2000~2099 菜单段） | 读写（**行级自清理**：测试数据命名前缀 + 用例自删，无每轮重置脚本） |
 | 前端 dev | 本机 `npm run dev` + 后端 | L3 端到端 | 只读 |
 
-- **连接约定**：凭据一律走环境变量，**不写进任何受跟踪文件或测试代码**——外部源侧 `VQMS_AVC_TEST_USER` + `VQMS_AVC_TEST_PASSWORD`（@3306），管理侧 `MYSQL_ROOT_PASSWORD`（@13306），本机起后端另需 `VQMS_REDIS_PASSWORD`（D6 `application-local.yml`）。⚠️ 史实警戒：D1~D5 期间三 IT 曾有硬编码兜底值，2026-08-21 起改环境变量必填，**旧值仍在 git 历史——两枚口令待轮换**（主库 root + 测试库 root）。
+- **连接约定**：凭据一律走环境变量，**不写进任何受跟踪文件或测试代码**——外部源侧 `VQMS_AVC_USER` + `VQMS_AVC_PASSWORD`（@3306），管理侧 `MYSQL_ROOT_PASSWORD`（@13306），本机起后端另需 `VQMS_REDIS_PASSWORD`（D6 `application-local.yml`）。⚠️ 史实警戒：D1~D5 期间三 IT 曾有硬编码兜底值，2026-08-21 起改环境变量必填，**旧值仍在 git 历史——两枚口令待轮换**（主库 root + 测试库 root）。
 - **并发与清理**：单人开发约定 + 共享 `ry_vqms` 行级自清理（D2/D5 IT 实践：命名前缀 + `@BeforeEach`/`@AfterAll` 自删）；`qheatavchisdb` 只读断言不污染。
 - **CI**：暂无（v1_0 的 GitHub Actions + Docker-in-Docker 方案随 Testcontainers 一并搁置）。将来若上 CI（runner 有 Docker），可恢复"现起容器 + 灌生成器 SQL"方案，与本地直连流程并存，测试代码不变——只换 profile。
 

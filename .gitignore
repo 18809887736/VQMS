@@ -18,3 +18,6 @@ Thumbs.db
 
 # jqwik 失败记忆数据库（序列化二进制，测试运行产物；已在 surefire 禁用）
 .jqwik-database
+
+# 现场数据库导出（大文件、可能含敏感数据，绝不提交）
+/docs/外部DB/现场/

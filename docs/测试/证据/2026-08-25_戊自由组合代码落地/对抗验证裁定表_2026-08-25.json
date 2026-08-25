@@ -124,5 +124,53 @@
   ],
   "post_verification_corrections": [
     "验证抓出 f65cafa 遗漏：策略文档 :12/:77/:135 三处「未实施」未随代码落地同步——已按勘误惯例补三条带日期批注（保留原句不抹历史），并将 §3.3.2 partial_missing_count 措辞对齐 S2/S3 实际落库形态（行级明细+rollup 派生，无字面同名列）"
-  ]
+  ],
+  "citation_audit": {
+    "date": "2026-08-25",
+    "trigger": "评审方第 VII 轮复核如实声明：file:line 引用仅抽查未逐条核对，建议作审计留痕前做引用级复核",
+    "method": "Workflow wf_247a258b-155：5 只读代理并行，逐条打开 evidence 引用的 文件:行号 核对内容语义；基准 HEAD=f65cafa（代码文件未再改动），策略文档经 cc91ebf 勘误后行号漂移按预期处理",
+    "totals": {
+      "refs_checked": 107,
+      "exact_ok": 91,
+      "line_drift": 16,
+      "substantive_mismatches": 0
+    },
+    "per_claim": [
+      {
+        "claimNum": 1,
+        "refs": 31,
+        "ok": 28,
+        "drift": 3
+      },
+      {
+        "claimNum": 2,
+        "refs": 11,
+        "ok": 11,
+        "drift": 0
+      },
+      {
+        "claimNum": 3,
+        "refs": 33,
+        "ok": 28,
+        "drift": 5
+      },
+      {
+        "claimNum": 4,
+        "refs": 17,
+        "ok": 13,
+        "drift": 4
+      },
+      {
+        "claimNum": 5,
+        "refs": 15,
+        "ok": 11,
+        "drift": 4
+      }
+    ],
+    "drift_cause": "16 处漂移全部为 docs/数据不可用处理策略.md 受 cc91ebf 勘误影响：≥78 行整体 +1（文头 :12 为原位改写不增行），内容全部在 ±1 行内找到、一字未动",
+    "corrections_to_evidence": [
+      "论断2 evidence 转写误差两处（不影响裁定）：① git grep freeform f65cafa 实际 23 个文件，evidence 写 21——少计且方向保守；② 完整哈希笔误 f65cfac379a… 应为 f65cafac379a…（漏一个 a，短形 f65cafa 各处正确）"
+    ],
+    "conclusion": "107 处引用零实质不符——裁定表可信等级升级为「引用级全量复核通过」，可作长期审计留痕"
+  }
 }

@@ -9,15 +9,18 @@
 -- 执行后需重新登录（菜单在登录时由 getRouters 接口拉取）
 -- =============================================================================
 
--- ---------- 一级目录（M，parent_id=0）----------
--- 2000 合格率统计
-insert into sys_menu values('2000', '合格率统计', '0', '5', 'stats', null, '', '', 1, 0, 'M', '0', '0', '', 'dashboard', 'admin', sysdate(), '', null, 'VQMS 合格率统计目录');
+-- ---------- VQMS 根目录（2026-08-25 菜单规划：业务四目录收拢至「电压质量」根下，与 RuoYi 平台菜单分层）----------
+-- 1500 电压质量（根，M，parent_id=0）
+insert into sys_menu values('1500', '电压质量', '0', '1', 'vqms', null, '', '', 1, 0, 'M', '0', '0', '', 'dashboard', 'admin', sysdate(), '', null, 'VQMS 业务根目录');
+-- ---------- 二级目录（M，parent_id=1500）----------
 -- 2010 曲线查询
-insert into sys_menu values('2010', '曲线查询', '0', '6', 'curve', null, '', '', 1, 0, 'M', '0', '0', '', 'chart', 'admin', sysdate(), '', null, 'VQMS 曲线查询目录');
--- 2020 AVC 考核
-insert into sys_menu values('2020', 'AVC 考核', '0', '7', 'avc', null, '', '', 1, 0, 'M', '0', '0', '', 'monitor', 'admin', sysdate(), '', null, 'VQMS AVC 考核目录');
--- 2030 系统配置
-insert into sys_menu values('2030', '系统配置', '0', '8', 'config-vqms', null, '', '', 1, 0, 'M', '0', '0', '', 'system', 'admin', sysdate(), '', null, 'VQMS 系统配置目录');
+insert into sys_menu values('2010', '曲线查询', '1500', '1', 'curve', null, '', '', 1, 0, 'M', '0', '0', '', 'chart', 'admin', sysdate(), '', null, 'VQMS 曲线查询目录');
+-- 2000 电压合格率（原「合格率统计」，2026-08-25 改名消歧——AVC 下另有调节合格率）
+insert into sys_menu values('2000', '电压合格率', '1500', '2', 'stats', null, '', '', 1, 0, 'M', '0', '0', '', 'dashboard', 'admin', sysdate(), '', null, 'VQMS 电压合格率统计目录');
+-- 2020 AVC考核
+insert into sys_menu values('2020', 'AVC考核', '1500', '3', 'avc', null, '', '', 1, 0, 'M', '0', '0', '', 'monitor', 'admin', sysdate(), '', null, 'VQMS AVC 考核目录');
+-- 2030 考核配置（原「系统配置」，避免与 RuoYi 系统管理/参数设置混淆）
+insert into sys_menu values('2030', '考核配置', '1500', '4', 'config-vqms', null, '', '', 1, 0, 'M', '0', '0', '', 'system', 'admin', sysdate(), '', null, 'VQMS 考核配置目录');
 
 -- ---------- 合格率统计 -> 菜单（C）----------
 insert into sys_menu values('2001', '日报', '2000', '1', 'daily', 'vqms/daily/index', '', 'VqmsDaily', 1, 0, 'C', '0', '0', 'vqms:daily:list', 'date', 'admin', sysdate(), '', null, '电压合格率日报');

@@ -139,6 +139,10 @@ function getState() {
     state.value = res.data || {};
     if (res.data && res.data.selectedCode) {
       form.presetCode = res.data.selectedCode;
+      // 持久化值回填表单：乙阈值取当前生效值（而非空默认）；戊由对话框打开时经 freeformRules/freeformThresholdPct 回填
+      if (res.data.selectedCode === "YI" && res.data.params && res.data.params.partial_missing_threshold_pct) {
+        form.thresholdPct = parseInt(res.data.params.partial_missing_threshold_pct, 10);
+      }
     }
   });
 }

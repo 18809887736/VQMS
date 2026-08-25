@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 部署 / 迁移 / 品牌去除计划 | `docs/部署/` | 运维与改造（2026-08-15 自 docs/ 根移入 部署/） |
 | 外部 DB 表 schema + 样例 | `docs/外部DB/` | 含 `外部数据源.md`、`qheatavchisdb_样本导出.md` 等 |
 
-> ⚠️ `docs/` 下另有 `tmp.md`（scratch 笔记）、`数据源头（草稿）.md`、`外部源表优化建议.md` 等——非权威，仅供参考。
+> ⚠️ `docs/` 下另有 `数据源头（草稿）.md`、`外部源表优化建议.md` 等——非权威，仅供参考。
 
 ## Architecture (v4.0 — RuoYi-Vue base, MySQL decided)
 

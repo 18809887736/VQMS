@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "date": "2026-08-25",
+    "subject": "外部评审五论断对抗验证（数据不可用处理策略 vs 代码，HEAD=f65cafa）",
+    "method": "Workflow wf_26ec1c2b-936：5 只读核查代理并行，每条配反驳任务；主会话另做实库直查",
+    "note": "verdict 枚举 CONFIRMED / CONFIRMED_WITH_CAVEATS / REFUTED / STALE；本表为机器可读权威裁定，叙述版见会话记录"
+  },
+  "claims": [
+    {
+      "claim": "论断1：DataUnavailabilityPolicy.evaluate() 忠实还原文档三层口径——三级优先链(Undecodable → invalidTiers非空 → completeness<1 → 正常记账)，纯函数；甲/乙/丙丁是同一函数的四组 PolicyConfig 参数向量而非代码分支；PolicyFunctionVectorTest 把四档在六种典型输入(解码失败/数据齐全/部分缺80%/部分缺40%/单档全缺/双档全缺)下的处置桶全部断言，与策略文档 §3.2 表格逐格对应。",
+      "verdict": "CONFIRMED_WITH_CAVEATS",
+      "evidence": [
+        "优先链逐条吻合（main 侧）：RuoYi-Vue-springboot3/ruoyi-vqms/src/main/java/com/ruoyi/vqms/statistics/DataUnavailabilityPolicy.java:34-37 「if (outcome instanceof RegulationOutcome.Undecodable) return config.undecodableMode();」→ :39-42 「if (!judged.invalidTiers().isEmpty()) return config.invalidTierMode();」→ :43-53 「if (judged.completeness() < 1.0)」内嵌 EXCLUDE_REPORTED 时「usablePct >= config.partialMissingThresholdPct() ? COUNT_NORMAL : EXCLUDE_REPORTED」（:47-50）→ :54 兜底「return Disposition.COUNT_NORMAL」。静态方法、无状态无 IO，纯函数成立；类 javadoc :10-17 显式列出同一条四级链。",
+        "文档侧锚点真实存在：docs/数据不可用处理策略.md:28-36（§2 统一处理三层口径：可用判定/分母归属/留痕上报）；优先链的短路次序由 §3.3.1 原子表明文规定——:91 「A1 成立时 A2/A3/A4 无从评估（管线短路）」、:95 「A2…与 A1 互斥（A1 短路在前）」，且 :104（§3.3.2）「规则表有序，首中即断（与现行 evaluate 优先级链同构）」。",
+        "四组参数向量而非代码分支（main 侧零名字分支）：statistics/PolicyPreset.java:23-36 四枚举常量均为纯参数元组（JIA=(EXCLUDE,EXCLUDE,COUNT_NORMAL,null)、YI=(EXCLUDE,EXCLUDE,EXCLUDE,50)、BING=(COUNT_UNQUALIFIED×3,null)、DING=(PEND_MARKED×3,null)），javadoc :7-9 「零行为分支：行为仍由 DataUnavailabilityPolicy#evaluate 按 PolicyConfig 纯函数决定」；PolicyConfig.java:19-38 为 record+构造期校验。全 main 源码 grep「甲乙丙丁」仅命中 javadoc/标签字符串；RegulationPipeline.java:266-276 dispositionOf 只按配置存在性路由（freeform 有→FreeformPolicyEvaluator，否则 preset→DataUnavailabilityPolicy.evaluate），不按套名分支。",
+        "六种输入齐全且命名对应：PolicyFunctionVectorTest.java:27-32 UNDECODABLE/FULL(1.0)/PARTIAL_80(0.8)/PARTIAL_40(0.4)/TIER_INVALID(Set.of(Tier.FAST))/ZERO_BOTH_INVALID(0.0,双档)——与论断列举的 解码失败/数据齐全/部分缺80%/部分缺40%/单档全缺/双档全缺 一一对应。断言格数审计：UNDECODABLE×4 全断言（:61-75 参数化四候选并遍历全部三种 DecodeFailureReason）；FULL×4（:77-82）；PARTIAL_80×4（:103,:110,:126,:132）；TIER_INVALID×4 与 ZERO_BOTH_INVALID×4 各两次 assertBucket（:95-96）= 共 21/24 格有期望处置断言；determinism 用例（:150-161）扫全部 4×6 组合但只断言同输入同输出（确定性），不锁期望桶。",
+        "阈值边界方向有专设边界用例：PolicyFunctionVectorTest.java:116-119 「Assertions.assertEquals(Disposition.COUNT_NORMAL, DataUnavailabilityPolicy.evaluate(judged(0.5, Set.of()), new PolicyConfig(…, 50)))」——可用度恰等于阈值 50% 判正常记账（≥ 含边界），与 docs/数据不可用处理策略.md:68 乙行「可用 <50% 弃，≥50% 用剩余」逐字吻合；两侧翼亦有（0.8→COUNT_NORMAL :110、0.4→EXCLUDE_REPORTED :111）。",
+        "测试期望表与 §3.2 表格逐格一致：PolicyFunctionVectorTest.java:65-70（解码失败：甲乙=EXCLUDE_REPORTED、丙=COUNT_UNQUALIFIED、丁=PEND_MARKED）与 :89-94（invalidTier 同表）对照 docs/数据不可用处理策略.md:65-70 §3.2 四行及 §4.2 解码失败三处理——完全对应；测试注释 :88 「S16（L>H）/S14（整档全缺）同族：invalidTiers 非空 → invalidTierMode」把 §3.2「整窗缺」列映射到 invalidTiers 轴，语义正确。"
+      ],
+      "caveats": [
+        "覆盖格数精确为 21/24 而非「全部」：PARTIAL_40（可用度 40%）仅对乙有期望桶断言（PolicyFunctionVectorTest.java:111），甲/丙/丁在该输入下无直接断言（其 partialMissingMode≠EXCLUDE_REPORTED，completeness 值只要 <1 即不影响输出，0.4 与 0.8 走同一代码路径，故属语义冗余而非盲区，但论断字面「全部断言」过强）。",
+        "阈值边界方向虽已实现并有边界用例，但代码两处显式标注 UNVERIFIED：DataUnavailabilityPolicy.java:19-21 与测试 ：112-115 注明正式 v1_0 §2.8 / v5.0 §8.6 的「缺失率 ≥50% 整窗剔除」措辞在边界点与本实现相反，实现取策略文档 §3.2 口径，随政策拍板须复核该用例——这是已登记的待决项，非隐藏不一致。",
+        "「三层口径=三级优先链」措辞略松：文档 §2 的三层指 可用判定/分母归属/留痕上报 三个决策维度，四级短路链的直接文本依据是 §3.3.1 原子排序与 §3.3.2「首中即断（与现行 evaluate 优先级链同构）」；且第三层（留痕上报计数）不在 evaluate() 内完成——Disposition.java:7-8 明示「计数由调用方做」，调用方 RegulationPipeline.java:245 计 undecodableCount。",
+        "六输入中的「解码失败」对应的是文档 §4.2（三种处理）而非论断所称 §3.2；§3.2 表只含部分缺/整窗缺两列——对应关系成立但出处应记为 §3.2+§4.2 合看。",
+        "测试侧确实存在按候选名的 switch（PolicyFunctionVectorTest.java:45-51、65-70、89-94）——但那是测试期望值表的合法形态，main 侧干净；且 PolicyPreset.java:12-14 已记录 2026-08-22 拍板对该约束的字面修订（禁行为硬编码、命名参数模板不违初衷），论断表述「而非代码分支」在 main 侧严格成立。",
+        "核查中发现一处论断之外的相邻漂移（供评审参考，不影响本论断）：最新提交 f65cafa 已落地「戊·自由组合」代码（statistics 包新增 FreeformPolicyEvaluator 等 + 管线自由组合优先路由，RegulationPipeline.java:270-275），但 docs/数据不可用处理策略.md §3.3（:12、:77、:135）仍标注「未实施、未动 S1 代码与 DDL」——该提交未同步更新策略文档，文档落后于代码一拍。"
+      ]
+    },
+    {
+      "claim": "论断2：「戊·自由组合一行代码都没写——全仓库搜 戊/FreeCombination/RuleTable/规则表 在 Java 和 SQL 里零匹配；文档申明不动代码是真的兑现了。」",
+      "caveats": [
+        "关键词半失真：字面标识符 FreeCombination 与 RuleTable 至今（含 HEAD）仍为零匹配——HEAD 的命中全是中文「规则表」（Freeform* 族的 javadoc/报错文案）。若评审者按原词表重跑检索会得到假阳性的「仍然零匹配」，正确证伪词是 戊 / freeform / FreeformPolicy*。",
+        "SQL 半句对 HEAD 依然为真：f65cafa 是零 DDL 实现（53 文件改动无一 .sql），自由组合配置以行式存储写入既有 vqms_policy_param 表（param_value varchar(255)，见测试报告与 CLAUDE.md 段落），/applyFreeform 复用既有权限 vqms:policyparam:apply 故无需菜单种子。",
+        "文档同步债（本次核查发现的新矛盾）：docs/数据不可用处理策略.md 第 12/75/77 行在 HEAD 仍声明「未实施、未动 S1 代码与 DDL」，而代码已落地——f65cafa 未回改这三处状态行，实施状态的权威记录目前只在提交信息/CLAUDE.md/测试报告中，策略文档正文与之冲突，待勘误（按项目惯例勘误不升版本号）。",
+        "实现的已知边界（报告自declared）：A5 免考旗阶段三子表未实现（解析器对 A5 显式拒绝）；命中规则 ID 落库列未加（Decision.ruleId 仅内存备好）；Service 持久化路径归联调批验证；分母口径冲突收窄校验随策略文档 §6-8 复核同批处理。",
+        "PolicyPreset 枚举无戊条目（仅 JIA/YI/BING/DING）——戊的生效由 freeform 键族存在性表达而非枚举值，前端卡片 code:\"WU\" 为前端局部表示，与单选生效机制一致但非后端枚举成员。"
+      ],
+      "evidence": [
+        "① 提交序列确认：`git log --oneline -12` 显示 HEAD=f65cfac379a05344d1f9f4a47e2ea75227b0506，其前一条即 462a60a「Update 数据不可用处理策略.md」，再前为 96bee80 同名更新；f65cafa 标题为「feat(vqms): 戊·自由组合候选代码落地 — 策略文档 §3.3 草案全链路实现，L0 全绿 264 例」。工作树干净，HEAD 即工作区。",
+        "② 462a60a 快照（论断为真的时点）：`git grep -c \"戊\" 462a60a -- '*.java'` 零匹配；`-- '*.sql'` 零匹配；`git grep -icE \"FreeCombination|RuleTable|规则表\" 462a60a -- '*.java' '*.sql'` 零匹配；`git grep -ilE \"freeform\" 462a60a`（全仓所有跟踪文件）零匹配。四关键词在该提交全部成立。",
+        "②' f65cafa 快照（论断失效）：`git grep -c \"戊\" f65cafa -- '*.java'` = 17 个文件（主代码 11 + 测试 6）；`git grep -ilE \"freeform\" f65cafa` = 21 个跟踪文件（含前端 RuoYi-Vue3/src/api/vqms/policyParam.js 与 views/vqms/policyparam/index.vue、测试报告及证据 XML）；`git show --stat f65cafa` = 53 files changed, 6519 insertions——**不含任何 .sql 文件**，`git grep -c \"戊\" f65cafa -- '*.sql'` 仍为零匹配。",
+        "③ 文档申明原文（C:\\work\\VQMS\\docs\\数据不可用处理策略.md:77，462a60a 与 HEAD 相同）：「⚠️ **本节为设计草案，未经拍板、未实施**：本次只改本文，不动 S1 判定逻辑代码、不动既有 DDL（`vqms_policy_param` 四约定键、`disposition` 一列四桶维持现状）。命名沿天干序取『戊』，与甲/乙/丙/丁同列。」另 :12「**待复核设计草案**（未实施、未动 S1 代码与 DDL；现行生效策略=乙）」。",
+        "③' HEAD 实现落点一（Service 键族与方法）：C:\\work\\VQMS\\RuoYi-Vue-springboot3\\ruoyi-vqms\\src\\main\\java\\com\\ruoyi\\vqms\\management\\service\\VqmsPolicyParamService.java:50-52「/** 戊·自由组合键族（策略文档 §3.3，2026-08-25 落地）：规则行 freeform_rule_001..N + 全局 τ */ static final String KEY_FREEFORM_RULE_PREFIX = \"freeform_rule_\"; static final String KEY_FREEFORM_THRESHOLD = \"freeform_threshold_pct\";」；:134 `public Map<String, Object> applyFreeform(List<String> ruleLines, Integer thresholdPct, String updateBy)`。",
+        "③'' HEAD 实现落点二（管线路由）：C:\\work\\VQMS\\RuoYi-Vue-springboot3\\ruoyi-vqms\\src\\main\\java\\com\\ruoyi\\vqms\\statistics\\RegulationPipeline.java:186-191「// 策略预取（单选生效 §3.3.4：戊·自由组合键族存在即优先，预设四键休眠…）Optional<FreeformPolicyConfig> freeformConfig = policyParamService.loadFreeformConfig(); Optional<PolicyConfig> presetConfig = freeformConfig.isPresent() ? Optional.empty() : policyParamService.loadConfig();」；:270-275 dispositionOf 中 freeformConfig.isPresent() → FreeformPolicyEvaluator.evaluate(...)，否则预设 DataUnavailabilityPolicy.evaluate，皆缺 → null。",
+        "③''' HEAD 实现落点三（控制器/前端）：C:\\work\\VQMS\\RuoYi-Vue-springboot3\\ruoyi-admin\\src\\main\\java\\com\\ruoyi\\web\\controller\\vqms\\VqmsPolicyParamController.java:76-79 `@PreAuthorize(\"@ss.hasPermi('vqms:policyparam:apply')\")` + `@PostMapping(\"/applyFreeform\")`（复用既有 perms，无需菜单 SQL）；RuoYi-Vue3/src/views/vqms/policyparam/index.vue:106 第五卡片 `{ code: \"WU\", label: \"戊\", description: \"自由组合（§3.3）\", freeform: true }` + :62 规则编辑对话框 + :164 handleApplyFreeform；RuoYi-Vue3/src/api/vqms/policyParam.js 导出 applyFreeform POST /vqms/policyParam/applyFreeform。statistics 包新增 8 主类：PolicyAtom/PolicyExpression/FreeformPolicyParser/FreeformRule/FreeformPolicyConfig/FreeformPolicyEvaluator/FreeformPolicyValidator/FreeformPolicyReducer（合计约 1021 行），另有 5 个新测试类。",
+        "④ 公开可溯性：C:\\work\\VQMS\\docs\\测试\\戊自由组合_测试报告_2026-08-25.md 存在（64 行），头部载明依据与授权：「Leo 同日 `/goal 代码侧实现` 指令开工」，:46「ruoyi-vqms : Tests run: 264, Failures: 0, Errors: 0, Skipped: 0」；证据目录 C:\\work\\VQMS\\docs\\测试\\证据\\2026-08-25_戊自由组合代码落地\\ 含五个新测试类 surefire XML（FreeformPolicyEvaluator/Parser/Reducer/Validator/RegulationPipelineTest）及全模块回归 XML；CLAUDE.md 于 f65cafa 增补专段「✅ 戊·自由组合候选代码已落地（2026-08-25，Leo /goal 指令）…L0 全绿 vqms 264 例」。非偷偷开关。"
+      ],
+      "verdict": "STALE"
+    },
+    {
+      "caveats": [
+        "论断措辞精度修正一：undecodable_count 列只存在于 rollup 三表（daily/monthly/yearly），明细表 vqms_regulation_cmd 无此列——明细存行级 undecodable_reason，计数由 rollup sum() 派生。论断若被读作「明细表也有 undecodable_count 列」则不准确。",
+        "对抗点③判定为「等价实现」而非「未落地」，但有边界：策略文档要求的缺数据侧两键 partial_missing_count / missing_window_count 全仓零字面落地（grep 仅命中文档 4 处），被行级 completeness decimal(5,4)[0,1]+invalid_tiers 表示替代——部分缺⟺0<completeness<1、整窗缺⟺completeness=0 或 invalid_tiers 全档标记，可从明细查询还原但无预计算 rollup 列、亦无专门的上报 UI 呈现层（设计决策③明确呈现归前端、前端尚未做）。等价性成立的依据：审计底线要求是「不静默消失」（策略文档 §1 行26「剔除可以，但必须留痕上报」），行级明细严格强于聚合计数；且现行乙选套下 partial_missing≈excluded_count（低于阈值者）、missing_window≈invalid 两档计数，口径映射成立但非同名一一对应。",
+        "RegulationPipeline 的 undecodableCount 是单次重算运行域披露（PipelineResult 返回值+日志行），不直接持久化；持久化走「行级 reason→rollup 求和」。论断「管线在统计 undecodableCount」两种意义上均成立，但引用时宜区分运行披露与落库两条线。",
+        "轻微文档-代码命名漂移：策略文档 §3.3.2 戊草案（行112）仍写「沿用既有归因计数键（undecodable_count 族 / partial_missing_count）照常计数」——partial_missing_count 实际并无对应列（乙选套下语义最近的是 excluded_count），该草案节自身标注「未实施」，不影响本论断但对齐时可顺手勘误。"
+      ],
+      "claim": "论断3：留痕上报(策略文档 §6 第3条「两类留痕字段都必报」)已在 S2/S3 落地不是空话——2026-08-24 统计落库 DDL 设计稿的 disposition 列(四桶)+undecodable_count 等计数列已建表合并主线，RegulationPipeline 里确实在统计 undecodableCount。",
+      "evidence": [
+        "① disposition 四桶列已建并合并主线：sql/migrations/2026-08-24_s2_s3_stats_tables.sql:47 `disposition varchar(32) default null comment '策略处置桶 COUNT_NORMAL/EXCLUDE_REPORTED/COUNT_UNQUALIFIED/PEND_MARKED（Disposition）；NULL=策略未生效（选套前只记不判）【决策①⑥】'`；主线 sql/vqms.sql:295「七、调节合格率统计表（指令级，S2 落地 2026-08-24）」内 ：319 同款列，:389 第八节投运率记账表同批入库。四桶枚举与 DDL 注释逐字对齐：RuoYi-Vue-springboot3/ruoyi-vqms/src/main/java/com/ruoyi/vqms/statistics/Disposition.java:13-22（COUNT_NORMAL/EXCLUDE_REPORTED/COUNT_UNQUALIFIED/PEND_MARKED）。",
+        "② 归因列在明细表而非 ledger：migration :43-44 `invalid_tiers varchar(16)...（成因粒度）` 与 `undecodable_reason varchar(32) default null comment '解码失败归因 CYCLE_CODE_INVALID/MISSING_T0_VOLTAGE/CORRUPTED_ENCODING；NULL=解码成功'`——三值恰对应策略文档 §4.2 的归因三分（docs/数据不可用处理策略.md:172-174 循环码非法/缺t₀电压/编码脏写）；vqms_command_ledger 无任何归因/计数列（sql/migrations/2026-08-22_d8_ledger_uk_generated_cols.sql 全文仅 uk 生成列+毫秒加宽），符合 v5.0 §6.2.6「ledger=原文摘录、归因属派生统计」分工。",
+        "③ undecodable_count 计数列已建：migration :66（daily）`:66 undecodable_count int not null default 0 comment '解码失败指令数（归因分布看明细表）'`，monthly :86、yearly :106 同构；vqms.sql :340/:360/:380 同款。另有 pended_count/excluded_count/completeness_sum 披露列（migration :67-69）。",
+        "④ RegulationPipeline 确实在统计：RuoYi-Vue-springboot3/ruoyi-vqms/src/main/java/com/ruoyi/vqms/statistics/RegulationPipeline.java:91 `record PipelineResult(int total, int written, int gateSkipped, int dirtyTimeSkipped, int undecodableCount, int stubBlocked)`；:195 `int undecodableCount = 0;`；Undecodable 分支 ：244-250 `undecodableCount++; ... row.setFastState(FinalTierState.INVALID.name()); ... row.setUndecodableReason(u.reason().name()); row.setDisposition(dispositionOf(outcome, presetConfig, freeformConfig))`；Judged 分支 :240 也写 disposition；:259-263 日志「判不了 {}」并随 PipelineResult 返回。域字段落点确认：VqmsRegulationCmd.java:27 `private String undecodableReason;`、:30 `private String disposition;`。",
+        "⑤ 计数由 rollup 从行级明细派生（非字面预存于明细）：RuoYi-Vue-springboot3/ruoyi-vqms/src/main/resources/mapper/vqms/VqmsStatsRollupMapper.xml:22-23 `sum(undecodable_reason is not null), sum(disposition='PEND_MARKED'), sum(disposition='EXCLUDE_REPORTED')` → 写入 daily 的 undecodable_count/pended_count/excluded_count。",
+        "⑥ 对抗检索证实派生口径：全仓 grep `partial_missing_count|missing_window_count` 仅命中 docs/数据不可用处理策略.md:34,:68,:112,:192（文档四处），代码/DDL 零命中；缺数据侧改由行级 completeness decimal(5,4) [0,1]（migration :42「窗口完整度（judge 如实上报原值）」）+invalid_tiers 承载。该替代是有据的设计拍板而非遗漏：docs/S2_S3_统计落库DDL设计稿_2026-08-24.md:5 拍板记录「①disposition 一列通吃四桶＋rollup 披露计数…Leo 当日全批推荐项」、:91 决策③「rollup 存计数（exempted/invalid × 两档 + undecodable_count），前端呈现层组合——计数是唯一 rollup 安全形态」。",
+        "⑦ 文档侧锚点核实：docs/数据不可用处理策略.md:200「3. 两类**留痕字段都必报**（无争议）。」（§6 第3条）；:192 §5 矩阵「留痕字段 | `partial_missing_count` / `missing_window_count` | `undecodable_count`（按原因分类）」；:26「剔除可以，但必须留痕上报（审计底线，无争议）」。仓库 HEAD=f65cafa 与任务描述一致，上述文件均在 HEAD 树中。"
+      ],
+      "verdict": "CONFIRMED_WITH_CAVEATS"
+    },
+    {
+      "caveats": [
+        "迁移脚本本身无执行记录注记：文件头注释（第 1~8 行）只有目的/背景/适用/幂等说明，没有「已于某日执行」标记；且 sql/migrations/ 下全部五个迁移均无此惯例——应用与否在本仓只能靠文字佐证（决策记录「已写入实库」+ CLAUDE.md:185 + L1 实库 IT 通过），数据库实际状态按任务分工由主会话直查确认。",
+        "仓库侧无法区分『迁移文件被手工执行』与『applyPreset(乙) 收敛到同态』：S5PolicySwitchIT 终态恢复乙时经 VqmsPolicyParamService 写入的四键向量与迁移产物完全一致，两条路径数据库终态不可分辨——不影响「当前实库=乙」的真伪，但『该迁移脚本确实被执行过』这一命题单凭仓库证据不可独立证明。",
+        "措辞精度：论断说『INSERT 四键』，脚本实为 UPDATE-then-conditional-INSERT 的幂等 upsert 模式（先 update 已有行、not exists 才 insert），语义上等效于把四键写入实库，非纯 INSERT——不影响结论，仅表述差异。",
+        "「当前实库=乙」是实例级事实而非全局缺省：s5_apply_yi.sql 第 7 行明示『全新部署仍从空表起步（选套属实例级配置，不入首初始化脚本）』——换新环境部署则实库≠乙，须重跑选套。",
+        "选套带显式保留条件：迁移头注释与决策记录均标注两项 UNVERIFIED（边界方向 ≥50%/<50% 与正式版 §2.8『缺失≥50% 剔除』措辞相反；与固定分母拍板的衔接），随正式政策文件复核——乙是已应用但附待复核条件的现行选择，文档自身（§3.3.5 第 128 行）也如此声明，与论断一致但构成限定语境。"
+      ],
+      "claim": "论断4：文档 §3.3.4 说『当前实库=乙』不是过期表述——2026-08-24 Leo 拍板选乙(阈值50)，迁移脚本把四个约定键写入 vqms_policy_param 实库。",
+      "evidence": [
+        "迁移脚本存在且四键值完全吻合：C:\\work\\VQMS\\sql\\migrations\\2026-08-24_s5_apply_yi.sql:10-15 「update vqms_policy_param set param_value='EXCLUDE_REPORTED', update_by='leo', update_time=now() where param_key='undecodable_mode'; insert into vqms_policy_param (...) select 'undecodable_mode', 'EXCLUDE_REPORTED', ... where not exists (...)」（UPDATE+条件 INSERT 幂等对）；同构段 :17-22 invalid_tier_mode='EXCLUDE_REPORTED'、:24-29 partial_missing_mode='EXCLUDE_REPORTED'；:31-36 partial_missing_threshold_pct='50'",
+        "迁移头注释载明拍板出处：sql\\migrations\\2026-08-24_s5_apply_yi.sql:1-2 「-- S5 选套应用：乙（阈值剔除+计数）写入 vqms_policy_param 四约定键（2026-08-24 Leo 拍板）/ -- 背景：政策选套拍板——Leo 2026-08-24 指定「乙（推荐）：缺失超阈值剔分母+计数」；阈值取默认 50」",
+        "拍板决策记录存在且内容吻合：C:\\work\\VQMS\\docs\\S5_政策选套与过渡期决策记录_2026-08-24.md:7 「**拍板**：Leo 2026-08-24 指定「乙（推荐）：缺失超阈值剔分母+计数」，阈值取默认 **50**（可用度百分比）。」；:8 「**落库**：`vqms_policy_param` 四约定键已写入 ry_vqms 实库（迁移 `sql/migrations/2026-08-24_s5_apply_yi.sql`，幂等可重放）」；:11-14 四键值表（undecodable_mode/invalid_tier_mode/partial_missing_mode=EXCLUDE_REPORTED、partial_missing_threshold_pct=50）",
+        "要求的同义表述逐字命中：docs\\S5_政策选套与过渡期决策记录_2026-08-24.md:55 「2. 若政策最终否决乙（如要求固定分母不剔除），策略参数页改选其他套别即可，工程零改动；」",
+        "文档 §3.3.4 原文确有该措辞：C:\\work\\VQMS\\docs\\数据不可用处理策略.md:119 节标题「#### 3.3.4 与甲/乙/丙/丁的关系」；:122 「**单选生效**：沿用现行全局单套生效机制——同一时刻恰有一套生效（当前实库=乙）。选中戊即以其规则表为准，四预设的四键向量被整体覆写；」；:128 再次印证「**当前实库生效的乙本身就带着此项待政策复核**」",
+        "时效性反证排除（措辞非过期）：§3.3 整节标注 2026-08-25 新增（docs\\数据不可用处理策略.md:75 「### 3.3 戊·自由组合（2026-08-25 新增 · ⚠️ 待复核设计草案）」）——「当前实库=乙」写于 08-24 选套之后一天，是事后现态陈述；git 显示该文档最近两次更新 96bee80/462a60a 均在 2026-08-25 上午，HEAD=f65cafa（2026-08-25 11:47:32 +0800）已核实为最新提交",
+        "无后续改选证据：sql/migrations/ 全目录仅五个文件（Glob 核实），除 s5_apply_yi 外无一触碰 vqms_policy_param 数据值；D9 建表迁移头注明「零种子行、不预设处置值」（2026-08-22_d9_policy_param_table.sql 注释），即 08-24 之前实库四键为空——不存在更早的其他套别被覆盖的歧义",
+        "L1 实库切换测试佐证终态为乙：C:\\work\\VQMS\\docs\\测试\\证据\\S5_PolicySwitchIT_一键切换通过_surefire_2026-08-24.xml:2 「tests=\"2\" errors=\"0\" skipped=\"0\" failures=\"0\"」；:67 换套日志链终步「VQMS 策略换套: DING → YI（乙·阈值剔除+计数（推荐）），操作人 it-switch」，:76 第二用例亦为「YI → YI」——测试跑在真实库上且终态恢复乙",
+        "CLAUDE.md:185 独立佐证：「✅ S5 选套已定并应用：乙（阈值剔除+计数，默认 50）2026-08-24 Leo 拍板——四约定键写入实库（迁移 s5_apply_yi）」",
+        "版本归属：迁移脚本与决策记录同一提交入库（git log --follow 显示两者均出自 3c583e1「feat(vqms): S5 选套应用与一键切换验证 — 三项过渡期决策记录」，2026-08-24 批次），时间线自洽"
+      ],
+      "verdict": "CONFIRMED_WITH_CAVEATS"
+    },
+    {
+      "claim": "论断5：分母口径冲突（固定发令总次数 vs 甲/乙/丁剔除分母族）这一已知风险在三个层面同步留痕未被掩盖——①文档头注 2026-08-19 再注 + §6 第8条；②DataUnavailabilityPolicy.evaluate() 的 ⚠ UNVERIFIED-口径 注释（阈值边界方向两份权威文档打架）；③S5 决策记录遗留提示。",
+      "caveats": [
+        "层面②定位不精确：⚠ UNVERIFIED-口径 块位于 DataUnavailabilityPolicy 的类级 Javadoc（19-21 行），evaluate() 方法自身的 Javadoc（29-31 行）并不携带该警告；「evaluate() Javadoc」系宽泛说法。",
+        "层面②的内容严格说是同族姊妹风险（阈值边界方向 ≥50% 语义打架），非分母口径冲突本身；分母冲突的代码侧披露另在 Disposition.java:15、PolicyFunctionVectorTest.java:13 与 FinalTierState/RegulationStatistics 类注释中。三层映射只有在把②读作同一「待政策拍板风险复合体」（如论断自身括号所做）时才成立。",
+        "文档-代码滞后（对抗点②残余张力）：f65cafa 已落地戊候选代码（含管线优先路由与前端第五卡片）但未回改策略文档（文档最后一次改动为 462a60a，早于 f65cafa），故 docs/数据不可用处理策略.md:12/77/135 的「未实施」措辞相对代码现状已陈旧；经核实其三项窄口径主张仍然为真——S1 判定逻辑未动（管线 diff 仅改策略处置路由）、零 DDL（f65cafa 全部 53 个变更文件无任何 sql/迁移文件）、现行生效策略=乙（freeform 键族缺省时预设模式，applyPreset 反向清理键族）——属措辞未同步而非风险被掩盖。",
+        "戊实现层三个新类（FreeformPolicyValidator/Reducer/Evaluator）的类级 Javadoc 本身未内联重复分母冲突警告（仅引 §3.3.2/§3.3.4）；继承声明分布在共享动作域类型 Disposition.java:15、PolicyAtom.A4、测试报告 ：29/:64、提交信息与 CLAUDE.md——可追溯但分散而非就地声明。",
+        "PolicyPreset 枚举无 WU 成员且其 Javadoc 无 UNVERIFIED 字样（S5 时代产物、f65cafa 未触碰）——不构成矛盾，但若审阅者期望预设枚举层也见标记，此处是空白点。"
+      ],
+      "evidence": [
+        "层面①头注：C:\\work\\VQMS\\docs\\数据不可用处理策略.md:5 —— 「⚠️ 2026-08-19 再注（分母口径拍板的连带）：调节合格率分母已定附件6 原始口径（发令总次数，Leo 拍板，正式 v1_0 §2.7）——本文甲/乙/丁候选中「剔除分母」类处理（跳过/阈值剔除/挂起）与新口径冲突：固定分母下判不了指令自动计入并拖低合格率。候选需按新口径复核——要么全部按「计不合格/标记上报」族重梳，要么政策明确允许对判不了类 carve-out（届时须重新拍板）」。",
+        "层面①§6 第8条：docs/数据不可用处理策略.md:205 —— 「分母口径与候选方案的冲突复核（2026-08-19 评审 V 自文头注提级为显式条目）：分母已定附件6 原始口径（固定发令总次数）后，甲/乙/丁中「剔除分母」类处理……与新口径冲突……要么全部按「计不合格 / 标记上报」族重梳，要么政策明确允许对判不了类 carve-out……（文头 2026-08-19 再注为本条出处）」。两处冲突定性（甲/乙/丁剔除族 vs 固定发令总次数）、双路解法（carve-out 或收敛计不合格）、互相引用完全同义同步。",
+        "层面②Javadoc：RuoYi-Vue-springboot3/ruoyi-vqms/src/main/java/com/ruoyi/vqms/statistics/DataUnavailabilityPolicy.java:19-21 —— 「⚠ UNVERIFIED-口径（对抗验证吸收 2026-08-22）：阈值边界取「可用度 ≥ 阈值 = 正常记账」（策略文档 §3.2 口径）——正式 v1_0 §2.8 / v5.0 §8.6 的缺失率措辞「≥50% 整窗剔除」在边界点与之相反。选套未定，边界方向随政策拍板一并钉死，届时复核」。与策略文档 §3.2（:68「可用 <50% 弃，≥50% 用剩余」）及 S5 记录表述一致。",
+        "层面③S5 遗留提示：docs/S5_政策选套与过渡期决策记录_2026-08-24.md:52-56（「## 六、遗留提示」，第54行「乙档两项 UNVERIFIED（上表 §一）随正式政策文件到位复核」，第55行「若政策最终否决乙（如要求固定分母不剔除），策略参数页改选其他套别即可」）；另有 §一 :16-18 明载「⚠ 两项 UNVERIFIED……2. 与固定分母拍板的衔接：披露合格率仍按全量分母（§2.7 拍板不变）；EXCLUDE_REPORTED 落在罚款缺额链」。",
+        "对抗点①无矛盾：戊实现层显式声明继承同一 UNVERIFIED 而非假装冲突已解决——docs/测试/戊自由组合_测试报告_2026-08-25.md:29「§6 第 8 条分母口径冲突未解不影响本落地：EXCLUDE_REPORTED 动作域与现行乙档同源同 UNVERIFIED，复核收敛时按 §3.3.5 第 1 条同步收窄校验即可」、:64「分母口径冲突收窄校验……随对应拍板批次排期（§3.3.5 清单）」；提交 f65cafa 提交信息与 CLAUDE.md 更新行均带「分母口径冲突收窄校验随 §6-8 复核」遗留项；共享动作域类型 Disposition.java:15 自带「合规风险项——选套待政策拍板」；PolicyAtom.java:63-66 A4 承接边界方向 UNVERIFIED（PolicyAtomTruthTableTest.java:14 测试侧同义回声）；FreeformPolicyValidator.validate()（:26-84）确实不拦截 EXCLUDE_REPORTED 规则——恰与 §3.3.5 第1行「现行校验不拦此类组合、拦截随复核结果再加」一致。",
+        "对抗点②两条原文均存在且互相一致：docs/数据不可用处理策略.md:12 文头「📌 2026-08-25 增补：新增 §3.3「戊·自由组合」——待复核设计草案（未实施、未动 S1 代码与 DDL；现行生效策略=乙）」；:128 §3.3.5 第1条「⚠️ 分母口径冲突随本节一并复核（2026-08-25 评审吸收·复核必过项）：本节处置动作域沿用四桶，其中 EXCLUDE_REPORTED（剔除分母+计数）与文头 2026-08-19 注 / §6 第 8 条已登记未解的「附件6 原始固定分母」口径直接冲突……该冲突非戊新增（甲/乙/丁同源，当前实库生效的乙本身就带着此项待政策复核），但戊把处置选择权进一步下放到规则表，矛盾暴露面随之扩大」；:135 边界重申与之呼应。"
+      ],
+      "verdict": "CONFIRMED_WITH_CAVEATS"
+    }
+  ],
+  "main_session_direct_checks": [
+    {
+      "claim": "论断4 实库侧：当前 vqms_policy_param=乙(τ=50) 且无 freeform 键族",
+      "method": "SSH 10.0.0.9 → docker exec vqms-mysql SELECT（评审方无库权限，由主会话代查并落档）",
+      "evidence_file": "实库直查_vqms_policy_param_2026-08-25.txt",
+      "result": {
+        "four_keys": "undecodable_mode/invalid_tier_mode/partial_missing_mode=EXCLUDE_REPORTED + partial_missing_threshold_pct=50",
+        "update_time": "2026-08-24 15:59:50",
+        "freeform_key_rows": 0
+      },
+      "verdict": "CONFIRMED"
+    }
+  ],
+  "post_verification_corrections": [
+    "验证抓出 f65cafa 遗漏：策略文档 :12/:77/:135 三处「未实施」未随代码落地同步——已按勘误惯例补三条带日期批注（保留原句不抹历史），并将 §3.3.2 partial_missing_count 措辞对齐 S2/S3 实际落库形态（行级明细+rollup 派生，无字面同名列）"
+  ]
+}

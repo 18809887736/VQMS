@@ -27,6 +27,8 @@ import com.ruoyi.vqms.management.mapper.VqmsCommandLedgerMapper;
 import com.ruoyi.vqms.management.mapper.VqmsRegulationCmdMapper;
 import com.ruoyi.vqms.management.service.VqmsJudgeParamService;
 import com.ruoyi.vqms.management.service.VqmsPolicyParamService;
+import com.ruoyi.vqms.statistics.FreeformPolicyEvaluator;
+import com.ruoyi.vqms.statistics.FreeformPolicyConfig;
 import com.ruoyi.vqms.source.model.HisCurveSv;
 import com.ruoyi.vqms.source.reader.MinuteRounder;
 import com.ruoyi.vqms.source.reader.SourceReader;
@@ -181,6 +183,13 @@ public class RegulationPipeline
             }
         }
 
+        // 策略预取（单选生效 §3.3.4：戊·自由组合键族存在即优先，预设四键休眠；
+        // 两者皆缺 → disposition NULL 只记不判）
+        Optional<FreeformPolicyConfig> freeformConfig = policyParamService.loadFreeformConfig();
+        Optional<PolicyConfig> presetConfig = freeformConfig.isPresent()
+                ? Optional.empty()
+                : policyParamService.loadConfig();
+
         List<VqmsRegulationCmd> rows = new ArrayList<>();
         int gateSkipped = 0;
         int undecodableCount = 0;
@@ -219,9 +228,7 @@ public class RegulationPipeline
             row.setYx501Fast(fastFlag);
             row.setYx501Econ(econFlag);
 
-            // 策略处置（S5 选套后生效；表空=未选套 → disposition NULL 只记不判）
-            Optional<PolicyConfig> policyConfig = policyParamService.loadConfig();
-
+            // 策略处置（S5 选套 / §3.3 戊·自由组合生效后写入；未选套 → NULL 只记不判）
             if (outcome instanceof RegulationOutcome.Judged j)
             {
                 TierFinalDisposition disp = ExemptionApplier.apply(j,
@@ -230,7 +237,7 @@ public class RegulationPipeline
                 row.setEconState(disp.econ().name());
                 row.setCompleteness(BigDecimal.valueOf(j.completeness()));
                 row.setInvalidTiers(joinTiers(j.invalidTiers()));
-                row.setDisposition(dispositionOf(outcome, policyConfig));
+                row.setDisposition(dispositionOf(outcome, presetConfig, freeformConfig));
             }
             else
             {
@@ -240,7 +247,7 @@ public class RegulationPipeline
                 row.setEconState(FinalTierState.INVALID.name()); // 整指令占位（allInvalid 语义）
                 row.setCompleteness(BigDecimal.ZERO);
                 row.setUndecodableReason(u.reason().name());
-                row.setDisposition(dispositionOf(outcome, policyConfig));
+                row.setDisposition(dispositionOf(outcome, presetConfig, freeformConfig));
             }
             rows.add(row);
         }
@@ -256,11 +263,15 @@ public class RegulationPipeline
                 dirtyTimeSkipped, undecodableCount, 0);
     }
 
-    /** 策略评估：未选套（配置缺）→ null；选套 → Disposition 枚举名。 */
+    /** 策略评估：自由组合键族优先（首中即断求值）；预设四键次之；皆缺 → null 只记不判。 */
     private static String dispositionOf(RegulationOutcome outcome,
-            Optional<PolicyConfig> policyConfig)
+            Optional<PolicyConfig> presetConfig, Optional<FreeformPolicyConfig> freeformConfig)
     {
-        return policyConfig.map(cfg -> DataUnavailabilityPolicy.evaluate(outcome, cfg).name())
+        if (freeformConfig.isPresent())
+        {
+            return FreeformPolicyEvaluator.evaluate(outcome, freeformConfig.get()).disposition().name();
+        }
+        return presetConfig.map(cfg -> DataUnavailabilityPolicy.evaluate(outcome, cfg).name())
                 .orElse(null);
     }
 

@@ -297,4 +297,65 @@ class RegulationPipelineTest
         assertEquals(0, r.written());
         verify(cmdMapper, never()).upsertBatch(any());
     }
+
+    @Test
+    void freeformRules_overrideDormantPreset()
+    {
+        // §3.3.4 单选生效：自由组合键族存在即优先，预设四键休眠——
+        // 同一条部分缺失指令（可用度 40%）：丙在效会计不合格；戊规则表不命中 → 兜底正常记账
+        when(policyParamService.loadFreeformConfig()).thenReturn(java.util.Optional.of(
+                new FreeformPolicyConfig(List.of(
+                        FreeformPolicyParser.parseRule("A1 -> PEND_MARKED")), 50)));
+        when(policyParamService.loadConfig())
+                .thenReturn(java.util.Optional.of(PolicyPreset.BING.config()));
+
+        List<HisCurveSv> partial = new java.util.ArrayList<>();
+        for (int offset : new int[] {1, 5})
+        {
+            HisCurveSv r5 = new HisCurveSv();
+            r5.setSaveTime(String.format("2026-03-23 10:%02d:00.000", offset));
+            r5.setBusbarNum(0L);
+            r5.setHighSV(new BigDecimal(225));
+            r5.setLowSV(new BigDecimal(222));
+            partial.add(r5);
+        }
+        when(sourceReader.readCurve(anyString(), anyString(), eq(0L))).thenReturn(partial);
+        when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString()))
+                .thenReturn(List.of(ledger(T0_TEXT, TARGET_TEXT, 0L)));
+
+        pipeline.recompute(DAY, DAY);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<VqmsRegulationCmd>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cmdMapper).upsertBatch(captor.capture());
+        assertEquals("COUNT_NORMAL", captor.getValue().get(0).getDisposition(),
+                "戊规则表未命中部分缺事实 → 兜底正常记账（丙被休眠，不得出 COUNT_UNQUALIFIED）");
+    }
+
+    @Test
+    void freeformDecodeSubtypeDispatch_endToEnd()
+    {
+        // 子类分发走全管线：缺 t₀（增量指令无实时电压）命中 R001 挂起待人工归因，
+        // 其余解码失败才落到 R002 剔除——预设四键表达不了的形状。
+        // （COUNT_NORMAL 不可用于解码轴——无判定结论可「正常记账」，校验器同口径拦截）
+        when(policyParamService.loadFreeformConfig()).thenReturn(java.util.Optional.of(
+                new FreeformPolicyConfig(List.of(
+                        FreeformPolicyParser.parseRule("A1C -> PEND_MARKED"),
+                        FreeformPolicyParser.parseRule("A1 -> EXCLUDE_REPORTED")), 50)));
+
+        VqmsBusbar noRealtime = new VqmsBusbar();
+        noRealtime.setBusbarNum(0L); // realtimeYcNum=null → 缺 t₀
+        when(busbarMapper.selectList()).thenReturn(List.of(noRealtime));
+        when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString()))
+                .thenReturn(List.of(ledger(T0_TEXT,
+                        "收到远方遥调执行指令:辽宁母线电压增量指令编码值处理,2202.", 0L)));
+
+        pipeline.recompute(DAY, DAY);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<VqmsRegulationCmd>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cmdMapper).upsertBatch(captor.capture());
+        VqmsRegulationCmd row = captor.getValue().get(0);
+        assertEquals("MISSING_T0_VOLTAGE", row.getUndecodableReason());
+        assertEquals("PEND_MARKED", row.getDisposition(),
+                "A1C 规则命中：缺 t₀ 挂起标记（采集问题非电厂锅，留人工后审）");
+    }
 }

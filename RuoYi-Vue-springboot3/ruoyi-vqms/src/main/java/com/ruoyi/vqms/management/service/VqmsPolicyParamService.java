@@ -17,6 +17,11 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.vqms.management.domain.VqmsPolicyParam;
 import com.ruoyi.vqms.management.mapper.VqmsPolicyParamMapper;
 import com.ruoyi.vqms.statistics.Disposition;
+import com.ruoyi.vqms.statistics.FreeformPolicyConfig;
+import com.ruoyi.vqms.statistics.FreeformPolicyParser;
+import com.ruoyi.vqms.statistics.FreeformPolicyReducer;
+import com.ruoyi.vqms.statistics.FreeformPolicyValidator;
+import com.ruoyi.vqms.statistics.FreeformRule;
 import com.ruoyi.vqms.statistics.PolicyConfig;
 import com.ruoyi.vqms.statistics.PolicyPreset;
 
@@ -41,6 +46,11 @@ public class VqmsPolicyParamService
     static final String KEY_INVALID_TIER_MODE = "invalid_tier_mode";
     static final String KEY_PARTIAL_MISSING_MODE = "partial_missing_mode";
     static final String KEY_PARTIAL_MISSING_THRESHOLD = "partial_missing_threshold_pct";
+
+    /** 戊·自由组合键族（策略文档 §3.3，2026-08-25 落地）：规则行 freeform_rule_001..N + 全局 τ */
+    static final String KEY_FREEFORM_RULE_PREFIX = "freeform_rule_";
+    static final String KEY_FREEFORM_THRESHOLD = "freeform_threshold_pct";
+    private static final int DEFAULT_FREEFORM_THRESHOLD = 50;
 
     @Autowired
     private VqmsPolicyParamMapper policyParamMapper;
@@ -79,6 +89,9 @@ public class VqmsPolicyParamService
         Map<String, String> params = preset.params(thresholdOverride);
         String oldState = describeCurrentSelection();
 
+        // 单选生效（§3.3.4）：切回预设即清除戊·自由组合键族，杜绝双源歧义
+        purgeFreeform(updateBy);
+
         for (Map.Entry<String, String> entry : params.entrySet())
         {
             VqmsPolicyParam existing = policyParamMapper.selectByKey(entry.getKey());
@@ -107,6 +120,200 @@ public class VqmsPolicyParamService
     }
 
     /**
+     * 戊·自由组合应用（策略文档 §3.3，2026-08-25 落地）：校验 fail-fast → 规则行整组 upsert
+     * freeform_rule_001..N + freeform_threshold_pct + 写穿缓存 + 等价规约提示。
+     *
+     * <p>单选生效：应用戊不清除四预设键（休眠保留，便于回切查看），求值侧以
+     * 自由组合键族存在为准——{@code applyPreset} 反向清理本键族，任意时刻恰有一套生效。</p>
+     *
+     * @param ruleLines    规则行原文列表（"表达式 -> 动作"），顺序即规则表序
+     * @param thresholdPct 全局 τ；null 用默认 50
+     * @param updateBy     操作人（审计）
+     * @return ruleCount / thresholdPct / reductionHint（可规约时的预设名提示，如 "YI"，无则 null）
+     */
+    public Map<String, Object> applyFreeform(List<String> ruleLines, Integer thresholdPct, String updateBy)
+    {
+        int tau = thresholdPct == null ? DEFAULT_FREEFORM_THRESHOLD : thresholdPct;
+        FreeformPolicyValidator.Validation validation = FreeformPolicyValidator.validate(ruleLines, tau);
+        if (!validation.ok())
+        {
+            throw new ServiceException("自由组合规则校验失败（原生效策略保持不变）: "
+                    + String.join("；", validation.errors()));
+        }
+        List<FreeformRule> rules = validation.rules();
+        String oldState = describeCurrentSelection();
+
+        // 旧键族清理（规则条数收缩时删除多余行）
+        Map<String, VqmsPolicyParam> existingFreeform = currentFreeformRowsByIndex();
+        for (String staleKey : staleFreeformKeys(existingFreeform.keySet(), rules.size()))
+        {
+            policyParamMapper.deleteByKey(staleKey);
+            redisCache.deleteObject(CACHE_PREFIX + staleKey);
+        }
+
+        upsertParam(KEY_FREEFORM_THRESHOLD, String.valueOf(tau), "戊·自由组合阈值 τ", updateBy);
+        for (int i = 0; i < rules.size(); i++)
+        {
+            FreeformRule rule = rules.get(i).withRuleId(FreeformPolicyValidator.ruleId(i));
+            upsertParam(KEY_FREEFORM_RULE_PREFIX + FreeformPolicyValidator.ruleId(i),
+                    FreeformPolicyValidator.storedValue(rule),
+                    "戊·自由组合规则 " + FreeformPolicyValidator.ruleId(i), updateBy);
+        }
+
+        String hint = reductionHint(rules, tau);
+        log.info("VQMS 策略换套: {} → WU·自由组合（{} 条规则，τ={}%，等价规约提示={}），操作人 {}",
+                oldState, rules.size(), tau, hint == null ? "无（扩展求值器路径）" : hint, updateBy);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ruleCount", rules.size());
+        out.put("thresholdPct", tau);
+        out.put("reductionHint", hint);
+        return out;
+    }
+
+    /** 等价规约提示（§3.3.4）：可规约时返回预设枚举名，否则 null */
+    private String reductionHint(List<FreeformRule> rules, int tau)
+    {
+        try
+        {
+            return FreeformPolicyReducer.reduce(new FreeformPolicyConfig(rules, tau))
+                    .map(FreeformPolicyReducer.Reduction::presetCode).orElse(null);
+        }
+        catch (RuntimeException e)
+        {
+            return null; // 提示是尽力而为的辅助信息，不影响应用主流程
+        }
+    }
+
+    private void upsertParam(String key, String value, String name, String updateBy)
+    {
+        VqmsPolicyParam existing = policyParamMapper.selectByKey(key);
+        if (existing == null)
+        {
+            VqmsPolicyParam row = new VqmsPolicyParam();
+            row.setParamKey(key);
+            row.setParamValue(value);
+            row.setName(name);
+            row.setDescription("戊·自由组合写入 " + java.time.LocalDate.now());
+            row.setCreateBy(updateBy);
+            policyParamMapper.insert(row);
+        }
+        else
+        {
+            policyParamMapper.updateValue(key, value, updateBy);
+        }
+        redisCache.setCacheObject(CACHE_PREFIX + key, value, 24, TimeUnit.HOURS);
+    }
+
+    private Map<String, VqmsPolicyParam> currentFreeformRowsByIndex()
+    {
+        Map<String, VqmsPolicyParam> out = new LinkedHashMap<>();
+        for (VqmsPolicyParam row : policyParamMapper.selectList())
+        {
+            if (row.getParamKey() != null
+                    && (row.getParamKey().startsWith(KEY_FREEFORM_RULE_PREFIX)
+                            || KEY_FREEFORM_THRESHOLD.equals(row.getParamKey())))
+            {
+                out.put(row.getParamKey(), row);
+            }
+        }
+        return out;
+    }
+
+    /** 超出本次规则数的遗留行键（freeform_rule_0NN > N）；τ 键恒保留 */
+    private List<String> staleFreeformKeys(java.util.Set<String> keys, int ruleCount)
+    {
+        List<String> stale = new java.util.ArrayList<>();
+        for (String key : keys)
+        {
+            if (!key.startsWith(KEY_FREEFORM_RULE_PREFIX))
+            {
+                continue;
+            }
+            try
+            {
+                int idx = Integer.parseInt(key.substring(KEY_FREEFORM_RULE_PREFIX.length()));
+                if (idx > ruleCount)
+                {
+                    stale.add(key);
+                }
+            }
+            catch (NumberFormatException e)
+            {
+                stale.add(key); // 非法后缀行一并清掉
+            }
+        }
+        return stale;
+    }
+
+    private void purgeFreeform(String updateBy)
+    {
+        Map<String, VqmsPolicyParam> freeform = currentFreeformRowsByIndex();
+        for (String key : freeform.keySet())
+        {
+            policyParamMapper.deleteByKey(key);
+            redisCache.deleteObject(CACHE_PREFIX + key);
+        }
+        if (!freeform.isEmpty())
+        {
+            log.info("VQMS 切回预设：清除戊·自由组合键族 {} 行", freeform.size());
+        }
+    }
+
+    /**
+     * 戊·自由组合生效配置装载（管线消费口）。
+     *
+     * @return 无 freeform_rule_* 行 → empty（预设模式）；行存在但解析/装配失败 →
+     *         IllegalStateException 显性失败（配置错误不静默降级到预设——防「以为在跑戊其实在跑乙」）
+     */
+    public Optional<FreeformPolicyConfig> loadFreeformConfig()
+    {
+        Map<String, VqmsPolicyParam> byKey = currentFreeformRowsByIndex();
+        List<VqmsPolicyParam> ruleRows = new java.util.ArrayList<>();
+        for (Map.Entry<String, VqmsPolicyParam> e : byKey.entrySet())
+        {
+            if (e.getKey().startsWith(KEY_FREEFORM_RULE_PREFIX))
+            {
+                ruleRows.add(e.getValue());
+            }
+        }
+        if (ruleRows.isEmpty())
+        {
+            return Optional.empty();
+        }
+        ruleRows.sort(java.util.Comparator.comparing(VqmsPolicyParam::getParamKey));
+        int tau = DEFAULT_FREEFORM_THRESHOLD;
+        VqmsPolicyParam tauRow = byKey.get(KEY_FREEFORM_THRESHOLD);
+        if (tauRow != null && tauRow.getParamValue() != null)
+        {
+            try
+            {
+                tau = Integer.parseInt(tauRow.getParamValue().trim());
+            }
+            catch (NumberFormatException e)
+            {
+                throw new IllegalStateException("自由组合阈值非整数: " + tauRow.getParamValue());
+            }
+        }
+        List<String> lines = new java.util.ArrayList<>();
+        for (VqmsPolicyParam row : ruleRows)
+        {
+            lines.add(row.getParamValue());
+        }
+        FreeformPolicyValidator.Validation validation = FreeformPolicyValidator.validate(lines, tau);
+        if (!validation.ok())
+        {
+            throw new IllegalStateException("自由组合规则表损坏（键族存在但校验不过）: "
+                    + String.join("；", validation.errors()));
+        }
+        List<com.ruoyi.vqms.statistics.FreeformRule> withIds = new java.util.ArrayList<>();
+        for (int i = 0; i < validation.rules().size(); i++)
+        {
+            withIds.add(validation.rules().get(i).withRuleId(FreeformPolicyValidator.ruleId(i)));
+        }
+        return Optional.of(new FreeformPolicyConfig(withIds, tau));
+    }
+
+    /**
      * 当前选套状态（页面三态，§8.7）：未选套 / 已选套。
      *
      * @return selectedCode=null 即未选套（表空或键不完整）；params=当前四键原值
@@ -116,6 +323,39 @@ public class VqmsPolicyParamService
         Map<String, Object> state = new LinkedHashMap<>();
         state.put("selectedCode", null);
         state.put("stateLabel", "未选套：策略未生效，搁置期只记不判");
+
+        // 戊·自由组合优先（§3.3.4 单选生效：键族存在即戊在效，四预设键休眠）
+        boolean hasFreeform = currentFreeformRowsByIndex().keySet().stream()
+                .anyMatch(k -> k.startsWith(KEY_FREEFORM_RULE_PREFIX));
+        if (hasFreeform)
+        {
+            try
+            {
+                FreeformPolicyConfig cfg = loadFreeformConfig()
+                        .orElseThrow(() -> new IllegalStateException("规则行缺失"));
+                state.put("selectedCode", "WU");
+                String hint = reductionHint(cfg.rules(), cfg.thresholdPct());
+                String hintText = hint == null ? "" : "；等价规约提示 ≡ " + presetLabel(hint);
+                state.put("stateLabel", "已选套：戊·自由组合（" + cfg.rules().size()
+                        + " 条规则，τ=" + cfg.thresholdPct() + "%" + hintText
+                        + "）；记账生效随统计管线");
+                state.put("freeformThresholdPct", cfg.thresholdPct());
+                List<String> lines = new java.util.ArrayList<>();
+                for (com.ruoyi.vqms.statistics.FreeformRule r : cfg.rules())
+                {
+                    lines.add(r.expressionText() + " -> " + r.action().name());
+                }
+                state.put("freeformRules", lines);
+            }
+            catch (RuntimeException e)
+            {
+                state.put("selectedCode", "WU");
+                state.put("stateLabel", "已选套：戊·自由组合（⚠ 规则表损坏: " + e.getMessage()
+                        + "——统计侧显性失败，请重新应用修复）");
+            }
+            return state;
+        }
+
         Map<String, String> current = currentKeyValues();
         state.put("params", current);
         if (!current.isEmpty())
@@ -192,6 +432,20 @@ public class VqmsPolicyParamService
     {
         Map<String, Object> state = currentState();
         return state.get("selectedCode") == null ? "未选套" : String.valueOf(state.get("selectedCode"));
+    }
+
+    /** 预设枚举名 → 中文标签（规约提示用）；未知名原样返回 */
+    private String presetLabel(String presetCode)
+    {
+        try
+        {
+            PolicyPreset p = PolicyPreset.valueOf(presetCode);
+            return p.getLabel() + "（" + p.getDescription() + "）";
+        }
+        catch (IllegalArgumentException e)
+        {
+            return presetCode;
+        }
     }
 
     /**

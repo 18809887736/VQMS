@@ -24,3 +24,13 @@ export function applyPreset(data) {
     data: data
   })
 }
+
+// 戊·自由组合应用（策略文档 §3.3）：{ rules: ["A1 -> EXCLUDE_REPORTED", ...], thresholdPct? }
+// 规则行有序、首中即断；校验 fail-fast，整体拒绝时原生效策略不变
+export function applyFreeform(data) {
+  return request({
+    url: '/vqms/policyParam/applyFreeform',
+    method: 'post',
+    data: data
+  })
+}

@@ -66,4 +66,26 @@ public class VqmsPolicyParamController extends BaseController
                 : Integer.valueOf(String.valueOf(body.get("thresholdPct")));
         return AjaxResult.success(policyParamService.applyPreset(presetCode, thresholdPct, getUsername()));
     }
+
+    /**
+     * 戊·自由组合应用（策略文档 §3.3，2026-08-25）：
+     * {@code {"rules":["A1 -> EXCLUDE_REPORTED","(A2 & !A3) -> PEND_MARKED"],"thresholdPct":50}}
+     * ——规则行有序、首中即断；thresholdPct 可空（默认 50）。校验 fail-fast，整体拒绝时原生效策略不变。
+     */
+    @SuppressWarnings("unchecked")
+    @PreAuthorize("@ss.hasPermi('vqms:policyparam:apply')")
+    @Log(title = "策略自由组合应用", businessType = BusinessType.UPDATE)
+    @PostMapping("/applyFreeform")
+    public AjaxResult applyFreeform(@RequestBody Map<String, Object> body)
+    {
+        Object rulesObj = body.get("rules");
+        if (!(rulesObj instanceof List))
+        {
+            return error("rules 须为规则行字符串数组");
+        }
+        Integer thresholdPct = body.get("thresholdPct") == null ? null
+                : Integer.valueOf(String.valueOf(body.get("thresholdPct")));
+        return AjaxResult.success(
+                policyParamService.applyFreeform((List<String>) rulesObj, thresholdPct, getUsername()));
+    }
 }

@@ -32,7 +32,8 @@ class D5PermsConsistencyTest
             "vqms:judgeparam:list", "vqms:judgeparam:add", "vqms:judgeparam:edit",
             "vqms:judgeparam:remove",
             "vqms:policyparam:list", "vqms:policyparam:apply",
-            "vqms:vqms_busbar:list");
+            "vqms:vqms_busbar:list", "vqms:vqms_busbar:query", "vqms:vqms_busbar:add",
+            "vqms:vqms_busbar:edit", "vqms:vqms_busbar:remove");
 
     private static final Class<?>[] CONTROLLERS = {
             VqmsCurveController.class, VqmsStatsController.class, VqmsAvcController.class,

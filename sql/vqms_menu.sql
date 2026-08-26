@@ -104,3 +104,19 @@ insert into sys_menu values('2046', '策略参数', '2030', '3', 'policyparam', 
 insert into sys_menu values('2047', '策略选套应用', '2046', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:policyparam:apply', '#', 'admin', sysdate(), '', null, '');
 insert into sys_role_menu values('2', '2046');
 insert into sys_role_menu values('2', '2047');
+
+
+-- ---------- 母线台账管理（2026-08-26：vqms_busbar 此前仅 DB 手工维护，现场数据接入后补页面 CRUD） ----------
+insert into sys_menu values('2048', '母线管理', '2030', '4', 'busbar', 'vqms/busbar/index', '', 'VqmsBusbar', 1, 0, 'C', '0', '0', 'vqms:vqms_busbar:list', 'build', 'admin', sysdate(), '', null, '母线台账管理（busbar CRUD）');
+insert into sys_menu values('2049', '母线查询', '2048', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:query', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2050', '母线新增', '2048', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:add', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2051', '母线修改', '2048', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:edit', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2052', '母线删除', '2048', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'vqms:vqms_busbar:remove', '#', 'admin', sysdate(), '', null, '');
+insert into sys_role_menu values('2', '2048');
+insert into sys_role_menu values('2', '2049');
+insert into sys_role_menu values('2', '2050');
+insert into sys_role_menu values('2', '2051');
+insert into sys_role_menu values('2', '2052');
+-- viewer(201) 只读
+insert into sys_role_menu values('201', '2048');
+insert into sys_role_menu values('201', '2049');

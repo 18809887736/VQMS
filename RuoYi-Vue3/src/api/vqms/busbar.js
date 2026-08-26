@@ -7,3 +7,37 @@ export function listBusbar() {
     method: 'get'
   })
 }
+
+// 母线详情
+export function getBusbar(busbarNum) {
+  return request({
+    url: '/vqms/vqms_busbar/' + busbarNum,
+    method: 'get'
+  })
+}
+
+// 新增母线
+export function addBusbar(data) {
+  return request({
+    url: '/vqms/vqms_busbar',
+    method: 'post',
+    data: data
+  })
+}
+
+// 修改母线
+export function updateBusbar(data) {
+  return request({
+    url: '/vqms/vqms_busbar',
+    method: 'put',
+    data: data
+  })
+}
+
+// 删除母线
+export function delBusbar(busbarNum) {
+  return request({
+    url: '/vqms/vqms_busbar/' + busbarNum,
+    method: 'delete'
+  })
+}

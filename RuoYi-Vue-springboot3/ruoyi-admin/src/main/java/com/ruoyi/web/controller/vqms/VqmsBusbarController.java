@@ -84,12 +84,27 @@ public class VqmsBusbarController extends BaseController
         }
     }
 
-    /** 删除母线 */
+    /** 母线的阈值配置引用数（UI 删除前预检） */
+    @PreAuthorize("@ss.hasPermi('vqms:vqms_busbar:query')")
+    @GetMapping(value = "/{busbarNum}/thresholdCount")
+    public AjaxResult thresholdCount(@PathVariable Long busbarNum)
+    {
+        return success(busbarService.countThresholds(busbarNum));
+    }
+
+    /** 删除母线（RESTRICT 守卫在 Service 层：有阈值配置引用即拒） */
     @PreAuthorize("@ss.hasPermi('vqms:vqms_busbar:remove')")
     @Log(title = "母线台账", businessType = BusinessType.DELETE)
     @DeleteMapping("/{busbarNum}")
     public AjaxResult remove(@PathVariable Long busbarNum)
     {
-        return toAjax(busbarService.deleteByBusbarNum(busbarNum));
+        try
+        {
+            return toAjax(busbarService.deleteByBusbarNum(busbarNum));
+        }
+        catch (IllegalArgumentException | IllegalStateException e)
+        {
+            throw new ServiceException(e.getMessage());
+        }
     }
 }

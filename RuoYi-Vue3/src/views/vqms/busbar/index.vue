@@ -97,7 +97,7 @@
 </template>
 
 <script setup name="VqmsBusbar">
-import { listBusbar, getBusbar, addBusbar, updateBusbar, delBusbar } from "@/api/vqms/busbar";
+import { listBusbar, getBusbar, addBusbar, updateBusbar, delBusbar, thresholdCount } from "@/api/vqms/busbar";
 
 const { proxy } = getCurrentInstance();
 const { vqms_v_grade, sys_normal_disable } = proxy.useDict("vqms_v_grade", "sys_normal_disable");
@@ -201,11 +201,18 @@ function submitForm() {
 }
 
 function handleDelete(row) {
-  proxy.$modal.confirm(`确认删除母线「${row.busbarName}（${row.busbarNum}）」？`).then(() => {
-    return delBusbar(row.busbarNum);
-  }).then(() => {
-    getList();
-    proxy.$modal.msgSuccess("删除成功");
+  thresholdCount(row.busbarNum).then(res => {
+    const cnt = Number(res.data) || 0;
+    if (cnt > 0) {
+      proxy.$modal.msgWarning(`无法删除「${row.busbarName}（${row.busbarNum}）」：有 ${cnt} 条阈值配置引用该母线，请先在阈值管理中清理`);
+      return;
+    }
+    proxy.$modal.confirm(`确认删除母线「${row.busbarName}（${row.busbarNum}）」？`).then(() => {
+      return delBusbar(row.busbarNum);
+    }).then(() => {
+      getList();
+      proxy.$modal.msgSuccess("删除成功");
+    }).catch(() => {});
   }).catch(() => {});
 }
 

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.vqms.management.domain.VqmsBusbar;
 import com.ruoyi.vqms.management.mapper.VqmsBusbarMapper;
 import com.ruoyi.vqms.management.mapper.VqmsBusbarGroupMapper;
+import com.ruoyi.vqms.management.mapper.VqmsBusbarThresholdMapper;
 
 /**
  * VQMS 主母线 Service（含逻辑 FK 校验）。
@@ -24,6 +25,9 @@ public class VqmsBusbarService
 
     @Autowired
     private VqmsBusbarGroupMapper busbarGroupMapper;
+
+    @Autowired
+    private VqmsBusbarThresholdMapper busbarThresholdMapper;
 
     public List<VqmsBusbar> selectList()
     {
@@ -54,11 +58,34 @@ public class VqmsBusbarService
     }
 
     /**
-     * 删除主母线。
+     * 删除主母线 —— RESTRICT 级联守卫：有阈值配置引用则拒绝（镜像 validateGroupNotReferenced 先例；
+     * 不做物理 CASCADE——阈值是带生效区间的考核配置，静默连删=配置丢失+审计断链）。
      */
     public int deleteByBusbarNum(Long busbarNum)
     {
+        validateBusbarNotReferenced(busbarNum);
         return busbarMapper.deleteByBusbarNum(busbarNum);
+    }
+
+    /** 母线的阈值配置引用数（UI 删除前预检用） */
+    public long countThresholds(Long busbarNum)
+    {
+        return busbarThresholdMapper.countByBusbarNum(busbarNum);
+    }
+
+    /**
+     * 删除前校验：该母线不能有阈值配置引用。
+     *
+     * @throws IllegalStateException 若有阈值引用则拒绝删除
+     */
+    public void validateBusbarNotReferenced(Long busbarNum)
+    {
+        long refCount = busbarThresholdMapper.countByBusbarNum(busbarNum);
+        if (refCount > 0)
+        {
+            throw new IllegalStateException(
+                    "无法删除 busbar_num=" + busbarNum + "：有 " + refCount + " 条阈值配置引用该母线，请先在阈值管理中清理");
+        }
     }
 
     /**

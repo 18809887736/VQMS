@@ -41,3 +41,11 @@ export function delBusbar(busbarNum) {
     method: 'delete'
   })
 }
+
+// 母线的阈值配置引用数（删除前预检）
+export function thresholdCount(busbarNum) {
+  return request({
+    url: '/vqms/vqms_busbar/' + busbarNum + '/thresholdCount',
+    method: 'get'
+  })
+}

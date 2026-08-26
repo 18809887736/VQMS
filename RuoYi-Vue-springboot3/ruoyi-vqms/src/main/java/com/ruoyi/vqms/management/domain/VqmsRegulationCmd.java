@@ -28,6 +28,7 @@ public class VqmsRegulationCmd implements Serializable
     private Integer yx501Fast;
     private Integer yx501Econ;
     private String disposition;
+    private String hitRuleId;
     private Date fetchedAt;
 
     public Long getId() { return id; }
@@ -60,6 +61,8 @@ public class VqmsRegulationCmd implements Serializable
     public void setYx501Econ(Integer yx501Econ) { this.yx501Econ = yx501Econ; }
     public String getDisposition() { return disposition; }
     public void setDisposition(String disposition) { this.disposition = disposition; }
+    public String getHitRuleId() { return hitRuleId; }
+    public void setHitRuleId(String hitRuleId) { this.hitRuleId = hitRuleId; }
     public Date getFetchedAt() { return fetchedAt; }
     public void setFetchedAt(Date fetchedAt) { this.fetchedAt = fetchedAt; }
 }

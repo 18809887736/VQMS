@@ -1,0 +1,7 @@
+跑批：mvn -pl ruoyi-vqms,ruoyi-admin -am test（JDK 17.0.20+8，2026-08-25）
+ruoyi-vqms : Tests run: 264, Failures: 0, Errors: 0, Skipped: 0
+ruoyi-admin: Tests run:   4, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+
+说明：本目录 XML 为上述全绿跑批的 surefire 产物（IT 不随默认 test，历史 IT XML 已剔除）。
+本批次代码变更：hit_rule_id 留痕列（迁移+域+mapper+管线）+ 选套页屏蔽固定候选（仅戊）。

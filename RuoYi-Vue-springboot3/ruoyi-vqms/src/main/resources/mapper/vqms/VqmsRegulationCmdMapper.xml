@@ -8,13 +8,13 @@
         insert into vqms_regulation_cmd
           (stat_date, warn_time, millisecond, obj_num, algorithm_id, t_fast_snapshot,
            fast_state, econ_state, completeness, invalid_tiers, undecodable_reason,
-           yx501_fast, yx501_econ, disposition)
+           yx501_fast, yx501_econ, disposition, hit_rule_id)
         values
         <foreach collection="list" item="c" separator=",">
           (#{c.statDate}, #{c.warnTime}, #{c.millisecond}, #{c.objNum}, #{c.algorithmId},
            #{c.tFastSnapshot}, #{c.fastState}, #{c.econState}, #{c.completeness},
            #{c.invalidTiers}, #{c.undecodableReason}, #{c.yx501Fast}, #{c.yx501Econ},
-           #{c.disposition})
+           #{c.disposition}, #{c.hitRuleId})
         </foreach>
         on duplicate key update
           stat_date = values(stat_date),
@@ -27,6 +27,7 @@
           undecodable_reason = values(undecodable_reason),
           yx501_fast = values(yx501_fast),
           yx501_econ = values(yx501_econ),
-          disposition = values(disposition)
+          disposition = values(disposition),
+          hit_rule_id = values(hit_rule_id)
     </insert>
 </mapper>

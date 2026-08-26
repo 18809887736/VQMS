@@ -8,47 +8,31 @@
       :title="state.stateLabel || '加载中…'"
     />
     <el-alert type="info" :closable="false" style="margin-bottom: 12px">
-      选套即整组写入约定键（甲乙丙丁 = 四键向量；戊 = 自由组合规则行族 freeform_rule_*），
-      写穿缓存、@Log 留痕。<span style="color:#909399">记账生效随统计管线（S4 调度启用后）；选套本身属政策拍板动作，权限默认仅授管理员。</span>
+      应用戊·自由组合即整组写入自由组合键族（freeform_rule_001..N + freeform_threshold_pct），
+      写穿缓存、@Log 留痕。<span style="color:#909399">记账生效随统计管线（S4 调度启用后）；策略应用属政策拍板动作，权限默认仅授管理员。</span>
     </el-alert>
 
-    <!-- 套别单选卡片（甲乙丙丁映射权威 = 后端 PolicyPreset 枚举；戊=自由组合 §3.3，规则表经对话框编辑） -->
+    <!-- 套别（2026-08-25 拍板：固定候选全部退役，唯一候选=戊·自由组合，策略文档 §3.3.4） -->
     <el-row :gutter="12" style="margin-bottom: 16px">
-      <el-col :span="6" v-for="p in presets" :key="p.code">
+      <el-col :span="6">
         <el-card
           shadow="hover"
-          :style="form.presetCode === p.code ? { borderColor: '#409eff', borderWidth: '2px' } : {}"
-          @click="selectPreset(p)"
+          :style="form.presetCode === 'WU' ? { borderColor: '#409eff', borderWidth: '2px' } : {}"
+          @click="selectPreset(presets[0])"
           style="cursor: pointer"
         >
           <div>
-            <b>{{ p.label }}</b>
-            <el-tag v-if="p.recommended" size="small" type="success" style="margin-left: 8px">推荐</el-tag>
-            <el-tag v-if="p.freeform" size="small" type="warning" style="margin-left: 8px">自定义</el-tag>
+            <b>戊</b>
+            <el-tag size="small" type="warning" style="margin-left: 8px">唯一候选</el-tag>
           </div>
-          <div style="color: #909399; font-size: 13px; margin-top: 6px">{{ p.description }}</div>
-          <div v-if="!p.freeform" style="font-size: 12px; margin-top: 8px; line-height: 1.8">
-            判不了：{{ modeText(p.undecodableMode) }}<br/>
-            档无效：{{ modeText(p.invalidTierMode) }}<br/>
-            部分缺：{{ modeText(p.partialMissingMode) }}<template v-if="p.code === 'YI'">（可用度阈值可整定）</template>
-          </div>
-          <div v-else style="font-size: 12px; margin-top: 8px; line-height: 1.8">
+          <div style="color: #909399; font-size: 13px; margin-top: 6px">自由组合（§3.3）</div>
+          <div style="font-size: 12px; margin-top: 8px; line-height: 1.8">
             原子条件自由组装有序规则表<br/>
-            （首中即断；点击卡片编辑规则）
+            （首中即断；点击卡片编辑规则并应用）
           </div>
         </el-card>
       </el-col>
     </el-row>
-
-    <el-form label-width="140px" style="max-width: 560px">
-      <el-form-item label="乙档阈值(%)" v-if="form.presetCode === 'YI'">
-        <el-input-number v-model="form.thresholdPct" :min="0" :max="100" :step="5" step-strictly controls-position="right" />
-        <span style="margin-left: 8px; color: #909399">部分缺可用度阈值，默认 50；留空用默认</span>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="handleApply" v-hasPermi="['vqms:policyparam:apply']">应用选套</el-button>
-      </el-form-item>
-    </el-form>
 
     <!-- 当前四键原值（只读） -->
     <el-divider content-position="left">当前参数（vqms_policy_param 原值，只读）</el-divider>
@@ -166,7 +150,7 @@
 </template>
 
 <script setup name="Policyparam">
-import { listPolicyParam, getPolicyState, applyPreset, applyFreeform } from "@/api/vqms/policyParam";
+import { listPolicyParam, getPolicyState, applyFreeform } from "@/api/vqms/policyParam";
 import {
   ATOM_OPTIONS, ACTION_OPTIONS, MAX_RULES, parseRuleLine, serializeRule,
   refsOfRule, newRule, validateRulesClient
@@ -176,13 +160,9 @@ const { proxy } = getCurrentInstance();
 
 const loading = ref(false);
 const dataList = ref([]);
-// 套别候选：甲乙丙丁与后端 PolicyPreset 枚举一一对应（仅渲染，不存映射）；
-// 戊=自由组合（策略文档 §3.3，2026-08-25），规则表语义权威在后端校验器
+// 套别（2026-08-25 拍板）：固定候选全部退役，唯一候选=戊·自由组合（策略文档 §3.3.4）；
+// 规则表语义权威在后端校验器，前端仅构建与渲染
 const presets = [
-  { code: "JIA", label: "甲", description: "宽松跳过", undecodableMode: "EXCLUDE_REPORTED", invalidTierMode: "EXCLUDE_REPORTED", partialMissingMode: "COUNT_NORMAL" },
-  { code: "YI", label: "乙", description: "阈值剔除+计数", recommended: true, undecodableMode: "EXCLUDE_REPORTED", invalidTierMode: "EXCLUDE_REPORTED", partialMissingMode: "EXCLUDE_REPORTED" },
-  { code: "BING", label: "丙", description: "计不合格", undecodableMode: "COUNT_UNQUALIFIED", invalidTierMode: "COUNT_UNQUALIFIED", partialMissingMode: "COUNT_UNQUALIFIED" },
-  { code: "DING", label: "丁", description: "标记挂起", undecodableMode: "PEND_MARKED", invalidTierMode: "PEND_MARKED", partialMissingMode: "PEND_MARKED" },
   { code: "WU", label: "戊", description: "自由组合（§3.3）", freeform: true }
 ];
 const state = ref({});
@@ -191,17 +171,11 @@ const atomOptions = ATOM_OPTIONS;
 const actionOptions = ACTION_OPTIONS;
 const ffDialog = reactive({ visible: false, rules: [], thresholdPct: 50, advancedText: "", corrupted: false });
 
-function modeText(mode) {
-  return { COUNT_NORMAL: "正常记账", EXCLUDE_REPORTED: "剔除+计数", COUNT_UNQUALIFIED: "计不合格", PEND_MARKED: "挂起标记" }[mode] || mode;
-}
-
 function selectPreset(p) {
   form.presetCode = p.code;
   if (p.freeform) {
     openFreeformDialog();
-    return;
   }
-  form.thresholdPct = p.code === "YI" ? 50 : undefined;
 }
 
 function openFreeformDialog() {
@@ -301,41 +275,9 @@ function getState() {
     state.value = res.data || {};
     if (res.data && res.data.selectedCode) {
       form.presetCode = res.data.selectedCode;
-      // 持久化值回填表单：乙阈值取当前生效值（而非空默认）；戊由对话框打开时经 freeformRules/freeformThresholdPct 回填
-      if (res.data.selectedCode === "YI" && res.data.params && res.data.params.partial_missing_threshold_pct) {
-        const v = parseInt(res.data.params.partial_missing_threshold_pct, 10);
-        if (Number.isFinite(v)) {
-          form.thresholdPct = v;
-        } else {
-          form.thresholdPct = undefined;
-          proxy.$modal.msgWarning("当前生效阈值非整数（直改库脏值？），请重选后应用");
-        }
-      }
+      // 戊的持久化值（规则行/τ）由对话框打开时经 freeformRules/freeformThresholdPct 回填
     }
   });
-}
-
-function handleApply() {
-  if (!form.presetCode) {
-    proxy.$modal.msgWarning("请先选择套别");
-    return;
-  }
-  if (form.presetCode === "WU") {
-    // 戊不走预设四键写路径——打开规则构建器
-    openFreeformDialog();
-    return;
-  }
-  const data = { presetCode: form.presetCode };
-  if (form.presetCode === "YI" && form.thresholdPct != null) {
-    data.thresholdPct = form.thresholdPct;
-  }
-  proxy.$modal.confirm(`确认应用套别「${form.presetCode}」？整组覆盖写入四约定键。`).then(() => {
-    applyPreset(data).then(() => {
-      proxy.$modal.msgSuccess("应用成功");
-      getList();
-      getState();
-    });
-  }).catch(() => {});
 }
 
 function handleApplyFreeform() {

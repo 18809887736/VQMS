@@ -317,6 +317,7 @@ create table vqms_regulation_cmd (
   yx501_fast          tinyint(1)   default null            comment '快速档时点免考旗 0/1（@t0+t_fast）；NULL=未采样（Undecodable 不走免考）',
   yx501_econ          tinyint(1)   default null            comment '经济档时点免考旗 0/1（@t0+t_econ+1 窗口闭合后）；NULL=未采样',
   disposition         varchar(32)  default null            comment '策略处置桶 COUNT_NORMAL/EXCLUDE_REPORTED/COUNT_UNQUALIFIED/PEND_MARKED（Disposition）；NULL=策略未生效（选套前只记不判）【决策①⑥】',
+  hit_rule_id         varchar(8)   default null            comment '戊命中规则 ID（R001…；NULL=兜底/预设模式/未选套）【2026-08-25 §3.3.2 留痕】',
   fetched_at          datetime     default current_timestamp comment '写入时间',
   primary key (id),
   unique key uk_cmd_result (warn_time, millisecond, obj_num_uk)

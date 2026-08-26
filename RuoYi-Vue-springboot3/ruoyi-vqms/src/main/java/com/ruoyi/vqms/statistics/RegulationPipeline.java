@@ -229,15 +229,17 @@ public class RegulationPipeline
             row.setYx501Econ(econFlag);
 
             // 策略处置（S5 选套 / §3.3 戊·自由组合生效后写入；未选套 → NULL 只记不判）
+            Disp policyDisp = dispositionOf(outcome, presetConfig, freeformConfig);
             if (outcome instanceof RegulationOutcome.Judged j)
             {
-                TierFinalDisposition disp = ExemptionApplier.apply(j,
+                TierFinalDisposition tierDisp = ExemptionApplier.apply(j,
                         fastFlag == null ? 0 : fastFlag, econFlag == null ? 0 : econFlag);
-                row.setFastState(disp.fast().name());
-                row.setEconState(disp.econ().name());
+                row.setFastState(tierDisp.fast().name());
+                row.setEconState(tierDisp.econ().name());
                 row.setCompleteness(BigDecimal.valueOf(j.completeness()));
                 row.setInvalidTiers(joinTiers(j.invalidTiers()));
-                row.setDisposition(dispositionOf(outcome, presetConfig, freeformConfig));
+                row.setDisposition(policyDisp.disposition());
+                row.setHitRuleId(policyDisp.ruleId());
             }
             else
             {
@@ -247,7 +249,8 @@ public class RegulationPipeline
                 row.setEconState(FinalTierState.INVALID.name()); // 整指令占位（allInvalid 语义）
                 row.setCompleteness(BigDecimal.ZERO);
                 row.setUndecodableReason(u.reason().name());
-                row.setDisposition(dispositionOf(outcome, presetConfig, freeformConfig));
+                row.setDisposition(policyDisp.disposition());
+                row.setHitRuleId(policyDisp.ruleId());
             }
             rows.add(row);
         }
@@ -263,16 +266,24 @@ public class RegulationPipeline
                 dirtyTimeSkipped, undecodableCount, 0);
     }
 
-    /** 策略评估：自由组合键族优先（首中即断求值）；预设四键次之；皆缺 → null 只记不判。 */
-    private static String dispositionOf(RegulationOutcome outcome,
+    /** 策略处置结果：桶名 + 命中规则 ID（戊模式专用；预设/未选套 ruleId=null）。 */
+    private record Disp(String disposition, String ruleId)
+    {
+    }
+
+    /** 策略评估：自由组合键族优先（首中即断求值，落命中规则 ID）；预设四键次之；皆缺 → NULL 只记不判。 */
+    private static Disp dispositionOf(RegulationOutcome outcome,
             Optional<PolicyConfig> presetConfig, Optional<FreeformPolicyConfig> freeformConfig)
     {
         if (freeformConfig.isPresent())
         {
-            return FreeformPolicyEvaluator.evaluate(outcome, freeformConfig.get()).disposition().name();
+            FreeformPolicyEvaluator.Decision d =
+                    FreeformPolicyEvaluator.evaluate(outcome, freeformConfig.get());
+            return new Disp(d.disposition().name(), d.ruleId());
         }
-        return presetConfig.map(cfg -> DataUnavailabilityPolicy.evaluate(outcome, cfg).name())
-                .orElse(null);
+        return presetConfig
+                .map(cfg -> new Disp(DataUnavailabilityPolicy.evaluate(outcome, cfg).name(), null))
+                .orElseGet(() -> new Disp(null, null));
     }
 
     private record T0Command(VqmsCommandLedger command, LocalDateTime t0)

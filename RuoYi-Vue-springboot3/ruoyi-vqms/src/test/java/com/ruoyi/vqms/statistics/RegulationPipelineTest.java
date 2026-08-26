@@ -243,6 +243,8 @@ class RegulationPipelineTest
         verify(cmdMapper).upsertBatch(captor.capture());
         assertEquals("EXCLUDE_REPORTED", captor.getValue().get(0).getDisposition(),
                 "选套乙：可用度 40% < 50% 阈值 → 剔除+计数");
+        assertNull(captor.getValue().get(0).getHitRuleId(),
+                "预设模式无命中规则 ID（§3.3.2 留痕：ruleId 仅戊模式落值）");
     }
 
     @Test
@@ -329,6 +331,8 @@ class RegulationPipelineTest
         verify(cmdMapper).upsertBatch(captor.capture());
         assertEquals("COUNT_NORMAL", captor.getValue().get(0).getDisposition(),
                 "戊规则表未命中部分缺事实 → 兜底正常记账（丙被休眠，不得出 COUNT_UNQUALIFIED）");
+        assertNull(captor.getValue().get(0).getHitRuleId(),
+                "兜底命中无规则 ID（§3.3.2：ruleId=null 即兜底口径）");
     }
 
     @Test
@@ -338,9 +342,9 @@ class RegulationPipelineTest
         // 其余解码失败才落到 R002 剔除——预设四键表达不了的形状。
         // （COUNT_NORMAL 不可用于解码轴——无判定结论可「正常记账」，校验器同口径拦截）
         when(policyParamService.loadFreeformConfig()).thenReturn(java.util.Optional.of(
-                new FreeformPolicyConfig(List.of(
-                        FreeformPolicyParser.parseRule("A1C -> PEND_MARKED"),
-                        FreeformPolicyParser.parseRule("A1 -> EXCLUDE_REPORTED")), 50)));
+                new FreeformPolicyConfig(java.util.List.of(
+                        FreeformPolicyParser.parseRule("A1C -> PEND_MARKED").withRuleId("R001"),
+                        FreeformPolicyParser.parseRule("A1 -> EXCLUDE_REPORTED").withRuleId("R002")), 50)));
 
         VqmsBusbar noRealtime = new VqmsBusbar();
         noRealtime.setBusbarNum(0L); // realtimeYcNum=null → 缺 t₀
@@ -357,5 +361,7 @@ class RegulationPipelineTest
         assertEquals("MISSING_T0_VOLTAGE", row.getUndecodableReason());
         assertEquals("PEND_MARKED", row.getDisposition(),
                 "A1C 规则命中：缺 t₀ 挂起标记（采集问题非电厂锅，留人工后审）");
+        assertEquals("R001", row.getHitRuleId(),
+                "命中规则 ID 落账（§3.3.2 留痕：审计可还原处置出处）");
     }
 }

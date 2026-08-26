@@ -8,7 +8,7 @@
       :title="state.stateLabel || '加载中…'"
     />
     <el-alert type="info" :closable="false" style="margin-bottom: 12px">
-      应用戊·自由组合即整组写入自由组合键族（freeform_rule_001..N + freeform_threshold_pct），
+      应用规则表即整组写入自由组合键族（freeform_rule_001..N + freeform_threshold_pct），
       写穿缓存、@Log 留痕。<span style="color:#909399">记账生效随统计管线（S4 调度启用后）；策略应用属政策拍板动作，权限默认仅授管理员。</span>
     </el-alert>
 
@@ -22,13 +22,11 @@
           style="cursor: pointer"
         >
           <div>
-            <b>戊</b>
-            <el-tag size="small" type="warning" style="margin-left: 8px">唯一候选</el-tag>
+            <b>数据不可用处置规则</b>
           </div>
-          <div style="color: #909399; font-size: 13px; margin-top: 6px">自由组合（§3.3）</div>
+          <div style="color: #909399; font-size: 13px; margin-top: 6px">自由组合 · 有序规则表（首中即断）</div>
           <div style="font-size: 12px; margin-top: 8px; line-height: 1.8">
-            原子条件自由组装有序规则表<br/>
-            （首中即断；点击卡片编辑规则并应用）
+            原子条件自由组装，点击卡片编辑规则并应用
           </div>
         </el-card>
       </el-col>
@@ -43,7 +41,7 @@
     </el-table>
 
     <!-- 戊·自由组合规则构建器（策略文档 §3.3；DSL 序列化经 rulesDsl.js，校验以服务端为准） -->
-    <el-dialog v-model="ffDialog.visible" title="戊·自由组合 — 规则表编辑" width="900px" top="6vh" class="scrollbar">
+    <el-dialog v-model="ffDialog.visible" title="数据不可用处置 — 规则表编辑" width="900px" top="6vh" class="scrollbar">
       <el-alert v-if="ffDialog.corrupted" type="error" :closable="false" style="margin-bottom: 12px">
         检测到规则源数据异常（损坏或部分行无法解析）——为防误覆写，<b>「校验并应用」已禁用</b>；请核对后修正再试。
       </el-alert>
@@ -163,7 +161,7 @@ const dataList = ref([]);
 // 套别（2026-08-25 拍板）：固定候选全部退役，唯一候选=戊·自由组合（策略文档 §3.3.4）；
 // 规则表语义权威在后端校验器，前端仅构建与渲染
 const presets = [
-  { code: "WU", label: "戊", description: "自由组合（§3.3）", freeform: true }
+  { code: "WU", freeform: true }
 ];
 const state = ref({});
 const form = reactive({ presetCode: null, thresholdPct: undefined });
@@ -294,7 +292,7 @@ function handleApplyFreeform() {
     return;
   }
   const data = { rules: rules.map(serializeRule), thresholdPct: ffDialog.thresholdPct };
-  proxy.$modal.confirm(`确认应用戊·自由组合（${rules.length} 条规则）？校验失败将整体拒绝、原策略保持不变。`).then(() => {
+  proxy.$modal.confirm(`确认应用规则表（${rules.length} 条规则）？校验失败将整体拒绝、原策略保持不变。`).then(() => {
     applyFreeform(data).then(res => {
       const hint = res.data && res.data.reductionHint;
       proxy.$modal.msgSuccess(hint ? `应用成功（等价规约提示 ≡ ${hint}，请自查是否误配）` : "应用成功");

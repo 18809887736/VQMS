@@ -151,13 +151,13 @@ public class VqmsPolicyParamService
             redisCache.deleteObject(CACHE_PREFIX + staleKey);
         }
 
-        upsertParam(KEY_FREEFORM_THRESHOLD, String.valueOf(tau), "戊·自由组合阈值 τ", updateBy);
+        upsertParam(KEY_FREEFORM_THRESHOLD, String.valueOf(tau), "自由组合阈值 τ", updateBy);
         for (int i = 0; i < rules.size(); i++)
         {
             FreeformRule rule = rules.get(i).withRuleId(FreeformPolicyValidator.ruleId(i));
             upsertParam(KEY_FREEFORM_RULE_PREFIX + FreeformPolicyValidator.ruleId(i),
                     FreeformPolicyValidator.storedValue(rule),
-                    "戊·自由组合规则 " + FreeformPolicyValidator.ruleId(i), updateBy);
+                    "自由组合规则 " + FreeformPolicyValidator.ruleId(i), updateBy);
         }
 
         String hint = reductionHint(rules, tau);
@@ -193,7 +193,7 @@ public class VqmsPolicyParamService
             row.setParamKey(key);
             row.setParamValue(value);
             row.setName(name);
-            row.setDescription("戊·自由组合写入 " + java.time.LocalDate.now());
+            row.setDescription("自由组合写入 " + java.time.LocalDate.now());
             row.setCreateBy(updateBy);
             policyParamMapper.insert(row);
         }
@@ -336,7 +336,7 @@ public class VqmsPolicyParamService
                 state.put("selectedCode", "WU");
                 String hint = reductionHint(cfg.rules(), cfg.thresholdPct());
                 String hintText = hint == null ? "" : "；等价规约提示 ≡ " + presetLabel(hint);
-                state.put("stateLabel", "已选套：戊·自由组合（" + cfg.rules().size()
+                state.put("stateLabel", "已选套：自由组合（" + cfg.rules().size()
                         + " 条规则，τ=" + cfg.thresholdPct() + "%" + hintText
                         + "）；记账生效随统计管线");
                 state.put("freeformThresholdPct", cfg.thresholdPct());
@@ -350,7 +350,7 @@ public class VqmsPolicyParamService
             catch (RuntimeException e)
             {
                 state.put("selectedCode", "WU");
-                state.put("stateLabel", "已选套：戊·自由组合（⚠ 规则表损坏: " + e.getMessage()
+                state.put("stateLabel", "已选套：自由组合（⚠ 规则表损坏: " + e.getMessage()
                         + "——统计侧显性失败，请重新应用修复）");
             }
             return state;

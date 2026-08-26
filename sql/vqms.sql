@@ -151,13 +151,23 @@ create table vqms_yc_point_map (
 -- 2003（远方就地总）2026-08-18 定号：对端配置库现成派生点 yx2003 = OR(yx12 正母, yx23 副母)，
 -- 1=远方/0=就地；warn_info 有 obj_num=2003「远方就地总合/分」事件佐证（docs/外部DB/JS计算引擎说明.md）。
 -- gate_enabled=0 保守同 3009：真实现场部署核对后置 1；合成库联调时测试环境手动置 1。
-insert into vqms_yc_point_map (yc_num, point_name, point_type, state_1_label, state_0_label, gate_enabled) values
-  (4001, '主母线号', 'busbar_id', null, null, 0),
-  (3009, 'AVC投退', 'yx', '投入', '退出', 0),
-  (2003, '远方就地总', 'yx', '远方', '就地', 0),
-  (501, '免考旗', 'yx', '免考', '考核', 0);
--- 501 免考旗（2026-08-24 S4 补种）：对端 JS 算好的全厂免考标志，阶段三后置读（正式版 §2.6）；
--- gate_enabled=0：门控语义不适用（它是免考应用信号、非门控），Pipeline 直读。
+insert into vqms_yc_point_map (yc_num, point_name, point_type, unit, state_1_label, state_0_label, gate_enabled, remark) values
+  (4001, '主母线号(合成占位)', 'busbar_id', null, null, null, 0, '合成占位 4001：真实候选 yc3（对端 BUSBAR_GROUP.MainBarYcNum = 3，值域预期 0/1 = 东/西母线，待现场核对）'),
+  (3009, 'AVC投退(合成占位)', 'yx', null, '投入', '退出', 0, '合成占位 3009：真实库 yx3009 = 四号机组下闭锁总信号（JS_DATA js109），撞号不同义、勿配真实环境；真实候选 yx1001'),
+  (2003, '远方就地总', 'yx', null, '远方', '就地', 0, '2026-08-18 定号：对端配置库现成派生点 yx2003 = OR(yx12 正母, yx23 副母)，1=远方/0=就地；warn_info 有 obj_num=2003「远方就地总合/分」事件佐证'),
+  (501, '免考旗', 'yx', null, '免考', '考核', 0, '2026-08-24 S4 补种：对端 JS 算好的全厂免考标志，阶段三后置读（正式版 §2.6）；gate_enabled=0 门控语义不适用，Pipeline 直读'),
+  (1001, 'AVC投退(现场候选)', 'yx', null, '投入', '退出', 0, '真实候选：AVC_INFO.AVCStatusYxNum=1001，CHUNNEL_YX 通道 3/4 转发佐证；⚠️ 语义待现场核对（不排除装置通信/闭锁状态）'),
+  (3,    '主母线号(现场候选)', 'busbar_id', null, null, null, 0, '真实候选：BUSBAR_GROUP.MainBarYcNum=3；值域预期 0/1=东/西母线待现场核对；CHUNNEL_YC 无此点、写入来源待核'),
+  (8,    '实时母线电压·东母(busbar 0)', 'voltage', 'kV', null, null, 0, 'BUSBAR.realVYcNum=8（PlanVReferenceYcNum 同点自证）；CHUNNEL_YC = 1#高压采集 ×0.01；待现场核对'),
+  (14,   '实时母线电压·西母(busbar 1)', 'voltage', 'kV', null, null, 0, 'BUSBAR.realVYcNum=14（PlanVReferenceYcNum 同点自证）；CHUNNEL_YC = 2#高压采集 ×0.01；待现场核对'),
+  (216,  '实时总有功·1号机', 'power', 'kW', null, null, 0, 'GENERATOR.pYcNum=216（CHUNNEL_YC 1#机组采集 ×100）；与 yc316 由 VQMS 相加得全厂总有功；待现场核对'),
+  (316,  '实时总有功·2号机', 'power', 'kW', null, null, 0, 'GENERATOR.pYcNum=316（CHUNNEL_YC 2#机组采集 ×100）；与 yc216 由 VQMS 相加得全厂总有功；待现场核对'),
+  (511,  '并网信号·正母单元', 'analog', null, null, null, 0, '对端 JS 算（外部DB/JS/JS_并网与母线号.sql）；编码 = 带电(1/0)×10 + 并网机组数；电厂并网 = yc511≥10 OR yc512≥10；RuntimePipeline 常量直读'),
+  (512,  '并网信号·副母单元', 'analog', null, null, null, 0, '同 yc511（副母单元）；对端 JS 周期求值'),
+  (521,  'AVC退出原因·正母', 'analog', null, null, null, 0, '接口已定待对端实现；三态 0=未退出 / 1=电网原因(免责) / 2=非电网原因(扣罚)'),
+  (522,  'AVC退出原因·副母', 'analog', null, null, null, 0, '接口已定待对端实现；三态同 yc521（副母）');
+-- 2026-08-26 填充：按数据源头（草稿）.md 定号一览补全注册表（14 行）——全部 gate_enabled=0 保守空转，
+-- 真实候选与合成占位并存、名称自明；现场核对后逐点换号/置 1。迁移：sql/migrations/2026-08-26_yc_point_map_fill.sql
 
 
 -- 5、判定整定参数（§6.2.5，v4.1 新增；RuoYi 代码生成 CRUD → /vqms/judgeParam + Redis 缓存 vqms:judgeParam:{key}）

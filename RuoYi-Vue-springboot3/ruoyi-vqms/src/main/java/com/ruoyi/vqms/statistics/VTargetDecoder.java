@@ -30,8 +30,25 @@ public final class VTargetDecoder
 
     private static final String TARGET_FORM_KEYWORD = "目标值";
 
+    /**
+     * 非电压指令关键词（对端实时库 BUSBAR_PLANTYPE id=2 的字典名，2026-08-26 考据）。
+     * ⚠ UNVERIFIED-ASSUMPTION：真实无功指令 warn_info 文本从未见过（合成库也无），
+     * 关键词按字典名推断，待真实数据回放核对覆盖度。
+     */
+    private static final String NON_VOLTAGE_KEYWORD = "无功增量";
+
     private VTargetDecoder()
     {
+    }
+
+    /**
+     * 非电压指令识别——文本含「无功增量」即排除出调节合格率分母（Leo 2026-08-26 拍板：
+     * 形态真值以指令文本为准，BUSBAR_PLANTYPE 仅考据存档不做表路由；无功指令无电压包络
+     * 口径，误入管线会被当增量形态解出无意义 V_target）。管线在脏时间过滤后、judge 前调用。
+     */
+    public static boolean isNonVoltage(String warnContent)
+    {
+        return warnContent != null && warnContent.contains(NON_VOLTAGE_KEYWORD);
     }
 
     /**

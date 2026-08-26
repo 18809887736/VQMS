@@ -217,6 +217,54 @@ class RegulationPipelineTest
     }
 
     @Test
+    void nonVoltage_skippedAndDisclosed_voltageStillJudged()
+    {
+        // 无功增量指令排除出分母（Leo 2026-08-26 拍板），同批电压指令照常判定
+        when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString())).thenReturn(List.of(
+                ledger(T0_TEXT, TARGET_TEXT, 0L),
+                ledger(T0_TEXT, "收到远方遥调执行指令:辽宁母线无功增量指令编码值处理,3202.", 0L)));
+        when(yxReader.heldValue(eq(501L), any())).thenReturn(Optional.of(0));
+
+        RegulationPipeline.PipelineResult r = pipeline.recompute(DAY, DAY);
+        assertEquals(2, r.total());
+        assertEquals(1, r.nonVoltageSkipped());
+        assertEquals(1, r.written());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<VqmsRegulationCmd>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cmdMapper).upsertBatch(captor.capture());
+        assertEquals(1, captor.getValue().size());
+        assertEquals("QUALIFIED", captor.getValue().get(0).getFastState());
+    }
+
+    @Test
+    void nonVoltageOnly_writesNothing()
+    {
+        when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString()))
+                .thenReturn(List.of(ledger(T0_TEXT,
+                        "收到远方遥调执行指令:辽宁母线无功增量指令编码值处理,3202.", 0L)));
+
+        RegulationPipeline.PipelineResult r = pipeline.recompute(DAY, DAY);
+        assertEquals(1, r.nonVoltageSkipped());
+        assertEquals(0, r.written());
+        verify(cmdMapper, never()).upsertBatch(any());
+    }
+
+    @Test
+    void sentinel_无功二字不误排_仅完整关键词生效()
+    {
+        // 文本含「无功」但非关键词「无功增量」→ 不排除，正常按目标值形态判定
+        when(ledgerMapper.selectByWarnTimeRange(anyString(), anyString()))
+                .thenReturn(List.of(
+                        ledger(T0_TEXT, "收到远方遥调执行指令:主省220KV目标值(无功联调期间),22315.", 0L)));
+        when(yxReader.heldValue(eq(501L), any())).thenReturn(Optional.of(0));
+
+        RegulationPipeline.PipelineResult r = pipeline.recompute(DAY, DAY);
+        assertEquals(0, r.nonVoltageSkipped());
+        assertEquals(1, r.written());
+    }
+
+    @Test
     void policySelected_dispositionEvaluatedAndPersisted()
     {
         // S5 选套乙：partial_missing=EXCLUDE_REPORTED@50——completeness=0.4 的指令剔除+计数

@@ -86,9 +86,9 @@ public class RegulationPipeline
         this.policyParamService = policyParamService;
     }
 
-    /** 一次重算的计数披露（门控拦截/脏时间/stub 拦截照实上报，不静默）。 */
+    /** 一次重算的计数披露（门控拦截/脏时间/非电压指令/stub 拦截照实上报，不静默）。 */
     public record PipelineResult(int total, int written, int gateSkipped,
-            int dirtyTimeSkipped, int undecodableCount, int stubBlocked)
+            int dirtyTimeSkipped, int nonVoltageSkipped, int undecodableCount, int stubBlocked)
     {
     }
 
@@ -107,7 +107,7 @@ public class RegulationPipeline
         {
             log.warn("VQMS 调节管线：当前判定实现为 STUB 占位——按护栏拒写正式统计表"
                     + "（切换 vqms.judge.algorithm=V1_0 后重跑本区间）");
-            return new PipelineResult(0, 0, 0, 0, 0, -1);
+            return new PipelineResult(0, 0, 0, 0, 0, 0, -1);
         }
 
         String rangeStart = DAY_TEXT.format(startDate) + " 00:00:00";
@@ -116,7 +116,7 @@ public class RegulationPipeline
                 ledgerMapper.selectByWarnTimeRange(rangeStart, rangeEndExclusive);
         if (commands.isEmpty())
         {
-            return new PipelineResult(0, 0, 0, 0, 0, 0);
+            return new PipelineResult(0, 0, 0, 0, 0, 0, 0);
         }
 
         // 配置预取：母线（实时电压点位）、组（主母线号指示点 + 兜底）
@@ -144,12 +144,20 @@ public class RegulationPipeline
         LocalDateTime maxT0 = null;
         List<T0Command> valid = new ArrayList<>();
         int dirtyTimeSkipped = 0;
+        int nonVoltageSkipped = 0;
         for (VqmsCommandLedger c : commands)
         {
             LocalDateTime t0 = MinuteRounder.parseAndRound(c.getWarnTime());
             if (t0 == null)
             {
                 dirtyTimeSkipped++;
+                continue;
+            }
+            // 非电压指令（Leo 2026-08-26 拍板：以指令文本为准）——排除出分母，仅披露；
+            // 不进 valid → 不参与 minT0/maxT0，曲线预取窗口不为它放宽
+            if (VTargetDecoder.isNonVoltage(c.getWarnContent()))
+            {
+                nonVoltageSkipped++;
                 continue;
             }
             valid.add(new T0Command(c, t0));
@@ -259,11 +267,11 @@ public class RegulationPipeline
         {
             cmdMapper.upsertBatch(rows);
         }
-        log.info("VQMS 调节管线重算 [{}, {}]: 总 {} 条 / 落账 {} / 门控拦 {} / 判不了 {} / 脏时间 {}",
+        log.info("VQMS 调节管线重算 [{}, {}]: 总 {} 条 / 落账 {} / 门控拦 {} / 判不了 {} / 非电压 {} / 脏时间 {}",
                 startDate, endDate, commands.size(), rows.size(), gateSkipped, undecodableCount,
-                dirtyTimeSkipped);
+                nonVoltageSkipped, dirtyTimeSkipped);
         return new PipelineResult(commands.size(), rows.size(), gateSkipped,
-                dirtyTimeSkipped, undecodableCount, 0);
+                dirtyTimeSkipped, nonVoltageSkipped, undecodableCount, 0);
     }
 
     /** 策略处置结果：桶名 + 命中规则 ID（戊模式专用；预设/未选套 ruleId=null）。 */

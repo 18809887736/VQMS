@@ -34,8 +34,10 @@ export default defineConfig(({ mode, command }) => {
       chunkSizeWarningLimit: 2000,
       rollupOptions: {
         output: {
-          chunkFileNames: 'static/js/[name]-[hash].js',
-          entryFileNames: 'static/js/[name]-[hash].js',
+          // 2026-08-25：index-* 命名被浏览器拦截类扩展误当广告资源（ERR_BLOCKED_BY_CLIENT 实测），
+          // 改 app-/chunk- 前缀避开通配拦截面
+          chunkFileNames: 'static/js/chunk-[hash].js',
+          entryFileNames: 'static/js/app-[hash].js',
           assetFileNames: 'static/[ext]/[name]-[hash].[ext]'
         }
       }

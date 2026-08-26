@@ -143,6 +143,7 @@ HEX 应以 `E7B3BBE7BB9F`（"系统管理"）开头；若看到 `C3A7C2B3...` �
 **完全不碰** mysql57 / new-api / postgres / redis / portainer。
 
 ## 更新已部署的代码
-- 改本机文件 → 重跑步骤 2（tar 重传覆盖）→ `docker compose up -d --build <service>`（仅重建变更的服务）。
+- **首选：`bash tools/deploy-update.sh [backend|nginx|all]`**（仓库根运行）——一条命令跑完 传输→构建→重启→探活，实测 ~25s/轮（2026-08-26）。只改后端传 `backend`、只改前端传 `nginx`，避免另一侧 26s+ 的无效重建。构建输出收进远端 `/tmp/vqms-bb.log` / `vqms-ng.log`（成功 tail 3 行 / 失败 tail 30 行）；探活轮询 `POST /prod-api/login` 非 000/502 即就绪。
+- 手工等价流程（脚本不可用时）：改本机文件 → 重跑步骤 2（tar 重传覆盖）→ `docker compose up -d --build <service>`（仅重建变更的服务）。
 - 仅改 `.env` / compose：重传 → `docker compose up -d`（compose 检测变化自动重建相关容器）。
 - mysql 初始化脚本变了（sql/ 改动）：需 `docker compose down -v` 删卷后重新 up（首启才会重跑 `/docker-entrypoint-initdb.d/`）。
